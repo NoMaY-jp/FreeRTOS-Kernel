@@ -217,7 +217,7 @@ StackType_t *pxPortInitialiseStack( StackType_t *pxTopOfStack, TaskFunction_t px
 			pxTopOfStack -= 2;
 			*(double *)pxTopOfStack =  101.0101; /* DR1. */
 			pxTopOfStack -= 2;
-				*(double *)pxTopOfStack = 9876.54321;/* DR0. */
+			*(double *)pxTopOfStack = 9876.54321;/* DR0. */
 		}
 		#else
 		{
