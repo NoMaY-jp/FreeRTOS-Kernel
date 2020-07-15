@@ -114,12 +114,17 @@ save and restore clobbered registers manually. */
 
 #define portYIELD_FROM_ISR( x )	if( ( x ) != pdFALSE ) portYIELD()
 
-/* Workaround to remove warning messages caused by Eclipse CDT Indexer. */
-#ifndef __CDT_PARSER__
-#define portCDT_NO_PARSE( token ) token
-#else
+/* Workaround to reduce errors/warnings caused by e2 studio CDT's INDEXER and CODAN. */
+#ifdef __CDT_PARSER__
+#ifndef __asm
+#define __asm asm
+#endif
+#ifndef __attribute__
+#define __attribute__(...)
+#endif
 #define portCDT_NO_PARSE( token )
-#define volatile
+#else
+#define portCDT_NO_PARSE( token ) token
 #endif
 
 /* These macros should not be called directly, but through the

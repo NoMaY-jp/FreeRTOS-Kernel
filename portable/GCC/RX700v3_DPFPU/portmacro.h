@@ -111,6 +111,16 @@ save and restore clobbered registers manually. */
 
 #define portYIELD_FROM_ISR( x )	if( ( x ) != pdFALSE ) portYIELD()
 
+/* Workaround to reduce errors/warnings caused by e2 studio CDT's INDEXER and CODAN. */
+#ifdef __CDT_PARSER__
+#ifndef __asm
+#define __asm asm
+#endif
+#ifndef __attribute__
+#define __attribute__(...)
+#endif
+#endif
+
 /* These macros should not be called directly, but through the
 taskENTER_CRITICAL() and taskEXIT_CRITICAL() macros.  An extra check is
 performed if configASSERT() is defined to ensure an assertion handler does not
