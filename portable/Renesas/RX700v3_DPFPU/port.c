@@ -60,6 +60,18 @@ any other value if the task does have a DPFPU context. */
 #define portNO_DPFPU_CONTEXT	( ( StackType_t ) 0 )
 #define portHAS_DPFPU_CONTEXT	( ( StackType_t ) 1 )
 
+/* The space on the stack required to hold the DPFPU data registers.  This is 16
+32-bit registers, except for R0 (for stack pointer) and R1 (for pvParameters). */
+#define portGENERAL_PURPOSE_REGISTER_WORDS	( 16 - 2 )
+
+/* The space on the stack required to hold the DPFPU data registers.  This is 6
+32-bit registers. */
+#define portACCUMULATOR_REGISTER_WORDS	( 6 )
+
+/* The space on the stack required to hold the DPFPU data registers.  This is 16
+64-bit registers. */
+#define portDPFPU_DATA_REGISTER_WORDS	( 16 * 2 )
+
 /*-----------------------------------------------------------*/
 
 /* The following lines are to ensure vSoftwareInterruptEntry can be referenced,
@@ -101,7 +113,9 @@ void vTickISR( void );
 
 /* Saved as part of the task context.  If ulPortTaskHasDPFPUContext is non-zero
 then a DPFPU context must be saved and restored for the task. */
-StackType_t ulPortTaskHasDPFPUContext = portNO_DPFPU_CONTEXT;
+#if( configUSE_TASK_DPFPU_SUPPORT == 1 )
+	StackType_t ulPortTaskHasDPFPUContext = portNO_DPFPU_CONTEXT;
+#endif
 
 /* This is accessed by the inline assembler functions so is file scope for
 convenience. */
@@ -156,29 +170,39 @@ StackType_t *pxPortInitialiseStack( StackType_t *pxTopOfStack, TaskFunction_t px
 		*pxTopOfStack = 0x33333333;
 		pxTopOfStack--;
 		*pxTopOfStack = 0x22222222;
-		pxTopOfStack--;
 	}
 	#else
 	{
-		pxTopOfStack -= 15;
+		pxTopOfStack -= portGENERAL_PURPOSE_REGISTER_WORDS;
+		memset( pxTopOfStack, 0x00, portGENERAL_PURPOSE_REGISTER_WORDS * sizeof( StackType_t ) );
 	}
 	#endif
 
+	pxTopOfStack--;
 	*pxTopOfStack = ( StackType_t ) pvParameters; /* R1 */
 	pxTopOfStack--;
 	*pxTopOfStack = portINITIAL_FPSW;
-	pxTopOfStack--;
-	*pxTopOfStack = 0x11111111; /* Accumulator 1. */
-	pxTopOfStack--;
-	*pxTopOfStack = 0x22222222; /* Accumulator 1. */
-	pxTopOfStack--;
-	*pxTopOfStack = 0x33333333; /* Accumulator 1. */
-	pxTopOfStack--;
-	*pxTopOfStack = 0x44444444; /* Accumulator 0. */
-	pxTopOfStack--;
-	*pxTopOfStack = 0x55555555; /* Accumulator 0. */
-	pxTopOfStack--;
-	*pxTopOfStack = 0x66666666; /* Accumulator 0. */
+	#ifdef USE_FULL_REGISTER_INITIALISATION
+	{
+		pxTopOfStack--;
+		*pxTopOfStack = 0x11111111; /* Accumulator 1. */
+		pxTopOfStack--;
+		*pxTopOfStack = 0x22222222; /* Accumulator 1. */
+		pxTopOfStack--;
+		*pxTopOfStack = 0x33333333; /* Accumulator 1. */
+		pxTopOfStack--;
+		*pxTopOfStack = 0x44444444; /* Accumulator 0. */
+		pxTopOfStack--;
+		*pxTopOfStack = 0x55555555; /* Accumulator 0. */
+		pxTopOfStack--;
+		*pxTopOfStack = 0x66666666; /* Accumulator 0. */
+	}
+	#else
+	{
+		pxTopOfStack -= portACCUMULATOR_REGISTER_WORDS;
+		memset( pxTopOfStack, 0x00, portACCUMULATOR_REGISTER_WORDS * sizeof( StackType_t ) );
+	}
+	#endif
 
 	#if( configUSE_TASK_DPFPU_SUPPORT == 1 )
 	{
@@ -229,7 +253,8 @@ StackType_t *pxPortInitialiseStack( StackType_t *pxTopOfStack, TaskFunction_t px
 		}
 		#else
 		{
-			pxTopOfStack -= 32;
+			pxTopOfStack -= portDPFPU_DATA_REGISTER_WORDS;
+			memset( pxTopOfStack, 0x00, portDPFPU_DATA_REGISTER_WORDS * sizeof( StackType_t ) );
 		}
 		#endif
 		pxTopOfStack--;
@@ -238,9 +263,6 @@ StackType_t *pxPortInitialiseStack( StackType_t *pxTopOfStack, TaskFunction_t px
 		*pxTopOfStack = portINITIAL_DCMR;  /* DCMR. */
 		pxTopOfStack--;
 		*pxTopOfStack = portINITIAL_DPSW;  /* DPSW. */
-		pxTopOfStack--;
-		*pxTopOfStack = portHAS_DPFPU_CONTEXT;
-		////????////ulPortTaskHasDPFPUContext = pdTRUE;
 	}
 	#elif( configUSE_TASK_DPFPU_SUPPORT == 0 )
 	{
@@ -331,20 +353,19 @@ static void prvStartFirstTask( void )
 	/* Restore the registers from the stack of the task pointed to by
 	pxCurrentTCB. */
 
-	#if( configUSE_TASK_DPFPU_SUPPORT != 0 )
+	#if( configUSE_TASK_DPFPU_SUPPORT == 1 )
 
-		/* Is there a DPFPU context to restore?  If the restored
-		ulPortTaskHasDPFPUContext is zero then no. */
+		/* The restored ulPortTaskHasDPFPUContext is to be zero here.
+		So, it is never necessary to restore the DPFPU context here. */
 		POP		R15
 		MOV.L	#_ulPortTaskHasDPFPUContext, R14
 		MOV.L	R15, [R14]
-		CMP		#0, R15
 
-		/* Restore the DPFPU context, if any. */
-		BEQ.B	?+
+	#elif ( configUSE_TASK_DPFPU_SUPPORT == 2 )
+
+		/* Restore the DPFPU context. */
 		DPOPM.L	DPSW-DECNT
 		DPOPM.D	DR0-DR15
-		?:
 
 	#endif
 
@@ -457,7 +478,7 @@ static void prvYieldHandler( void )
 	MVFACLO	#0, A0, R15
 	PUSH.L	R15
 
-	#if( configUSE_TASK_DPFPU_SUPPORT != 0 )
+	#if( configUSE_TASK_DPFPU_SUPPORT == 1 )
 
 		/* Does the task have a DPFPU context that needs saving?  If
 		ulPortTaskHasDPFPUContext is 0 then no. */
@@ -473,6 +494,12 @@ static void prvYieldHandler( void )
 
 		/* Save ulPortTaskHasDPFPUContext itself. */
 		PUSH.L	R15
+
+	#elif( configUSE_TASK_DPFPU_SUPPORT == 2 )
+
+		/* Save the DPFPU context, always. */
+		DPUSHM.D	DR0-DR15
+		DPUSHM.L	DPSW-DECNT
 
 	#endif
 
@@ -500,7 +527,7 @@ static void prvYieldHandler( void )
 	/* Restore the context of the new task.  The PSW (Program Status Word) and
 	PC will be popped by the RTE instruction. */
 
-	#if( configUSE_TASK_DPFPU_SUPPORT != 0 )
+	#if( configUSE_TASK_DPFPU_SUPPORT == 1 )
 
 		/* Is there a DPFPU context to restore?  If the restored
 		ulPortTaskHasDPFPUContext is zero then no. */
@@ -514,6 +541,12 @@ static void prvYieldHandler( void )
 		DPOPM.L		DPSW-DECNT
 		DPOPM.D		DR0-DR15
 		?:
+
+	#elif( configUSE_TASK_DPFPU_SUPPORT == 2 )
+
+		/* Restore the DPFPU context, always. */
+		DPOPM.L		DPSW-DECNT
+		DPOPM.D		DR0-DR15
 
 	#endif
 
