@@ -65,14 +65,6 @@
 #define portHAS_DPFPU_CONTEXT   ( ( StackType_t ) 1 )
 
 /* The space on the stack required to hold the DPFPU data registers.  This is 16
- * 32-bit registers, except for R0 (for stack pointer) and R1 (for pvParameters). */
-#define portGENERAL_PURPOSE_REGISTER_WORDS  ( 16 - 2 )
-
-/* The space on the stack required to hold the DPFPU data registers.  This is 6
- * 32-bit registers. */
-#define portACCUMULATOR_REGISTER_WORDS  ( 6 )
-
-/* The space on the stack required to hold the DPFPU data registers.  This is 16
  * 64-bit registers. */
 #define portDPFPU_DATA_REGISTER_WORDS   ( 16 * 2 )
 
@@ -178,39 +170,29 @@ StackType_t * pxPortInitialiseStack( StackType_t * pxTopOfStack,
             *pxTopOfStack = 0x33333333;
             pxTopOfStack--;
             *pxTopOfStack = 0x22222222;
+            pxTopOfStack--;
         }
     #else /* ifdef USE_FULL_REGISTER_INITIALISATION */
         {
-            pxTopOfStack -= portGENERAL_PURPOSE_REGISTER_WORDS;
-            memset( pxTopOfStack, 0x00, portGENERAL_PURPOSE_REGISTER_WORDS * sizeof( StackType_t ) );
+            pxTopOfStack -= 15;
         }
     #endif /* ifdef USE_FULL_REGISTER_INITIALISATION */
 
-    pxTopOfStack--;
     *pxTopOfStack = ( StackType_t ) pvParameters; /* R1 */
     pxTopOfStack--;
     *pxTopOfStack = portINITIAL_FPSW;
-    #ifdef USE_FULL_REGISTER_INITIALISATION
-        {
-            pxTopOfStack--;
-            *pxTopOfStack = 0x11111111; /* Accumulator 1. */
-            pxTopOfStack--;
-            *pxTopOfStack = 0x22222222; /* Accumulator 1. */
-            pxTopOfStack--;
-            *pxTopOfStack = 0x33333333; /* Accumulator 1. */
-            pxTopOfStack--;
-            *pxTopOfStack = 0x44444444; /* Accumulator 0. */
-            pxTopOfStack--;
-            *pxTopOfStack = 0x55555555; /* Accumulator 0. */
-            pxTopOfStack--;
-            *pxTopOfStack = 0x66666666; /* Accumulator 0. */
-        }
-    #else /* ifdef USE_FULL_REGISTER_INITIALISATION */
-        {
-            pxTopOfStack -= portACCUMULATOR_REGISTER_WORDS;
-            memset( pxTopOfStack, 0x00, portACCUMULATOR_REGISTER_WORDS * sizeof( StackType_t ) );
-        }
-    #endif /* ifdef USE_FULL_REGISTER_INITIALISATION */
+    pxTopOfStack--;
+    *pxTopOfStack = 0x11111111; /* Accumulator 1. */
+    pxTopOfStack--;
+    *pxTopOfStack = 0x22222222; /* Accumulator 1. */
+    pxTopOfStack--;
+    *pxTopOfStack = 0x33333333; /* Accumulator 1. */
+    pxTopOfStack--;
+    *pxTopOfStack = 0x44444444; /* Accumulator 0. */
+    pxTopOfStack--;
+    *pxTopOfStack = 0x55555555; /* Accumulator 0. */
+    pxTopOfStack--;
+    *pxTopOfStack = 0x66666666; /* Accumulator 0. */
 
     #if ( configUSE_TASK_DPFPU_SUPPORT == 1 )
         {
@@ -273,13 +255,13 @@ StackType_t * pxPortInitialiseStack( StackType_t * pxTopOfStack,
             *pxTopOfStack = portINITIAL_DPSW;  /* DPSW. */
         }
     #elif ( configUSE_TASK_DPFPU_SUPPORT == 0 )
-    {
-        /* Omit DPFPU support. */
-    }
+        {
+            /* Omit DPFPU support. */
+        }
     #else /* if ( configUSE_TASK_DPFPU_SUPPORT == 1 ) */
-    {
-        #error Invalid configUSE_TASK_DPFPU_SUPPORT setting - configUSE_TASK_DPFPU_SUPPORT must be set to 0, 1, 2, or left undefined.
-    }
+        {
+            #error Invalid configUSE_TASK_DPFPU_SUPPORT setting - configUSE_TASK_DPFPU_SUPPORT must be set to 0, 1, 2, or left undefined.
+        }
     #endif /* if ( configUSE_TASK_DPFPU_SUPPORT == 1 ) */
 
     return pxTopOfStack;
