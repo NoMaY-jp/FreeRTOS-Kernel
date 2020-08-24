@@ -19,10 +19,9 @@
  * IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  *
- * http://www.FreeRTOS.org
- * http://aws.amazon.com/freertos
+ * https://www.FreeRTOS.org
+ * https://github.com/FreeRTOS
  *
- * 1 tab == 4 spaces!
  */
 
 /*
@@ -41,6 +40,7 @@
 
 volatile unsigned int ulCriticalNesting = 999UL;
 volatile unsigned int context_switch_reqflg; /* task context switch request flag in exceptions and interrupts handling */
+
 /**
  * \var exc_nest_count
  * \brief the counter for exc/int processing, =0 no int/exc
