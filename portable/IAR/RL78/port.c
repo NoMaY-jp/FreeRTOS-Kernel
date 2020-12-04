@@ -103,76 +103,67 @@ uint32_t *pulLocal;
 	sizeof( StackType_t * ) == 4.  With small code and small data
 	sizeof( StackType_t ) == 2 and sizeof( StackType_t * ) == 2. */
 
+	/* The return address, leaving space for the first two bytes of	the
+	32-bit value.  See the comments above the prvTaskExitError() prototype
+	at the top of this file. */
+	pxTopOfStack--;
+	pulLocal = ( uint32_t * ) pxTopOfStack;
+	*pulLocal = ( uint32_t ) prvTaskExitError;
+	pxTopOfStack--;
+
+	/* The start address / PSW value is also written in as a 32-bit value,
+	so leave a space for the second two bytes. */
+	pxTopOfStack--;
+
+	/* Task function start address combined with the PSW. */
+	pulLocal = ( uint32_t * ) pxTopOfStack;
+	*pulLocal = ( ( ( uint32_t ) pxCode ) | ( portPSW << 24UL ) );
+	pxTopOfStack--;
+
 	#if __DATA_MODEL__ == __DATA_MODEL_FAR__
 	{
-		/* Parameters are passed in on the stack, and written using a 32-bit value
-		hence a space is left for the second two bytes. */
+		/* The lower 8-bit value of upper 16-bit value of parameter is
+		passed in A.  X is zero. */
+		*pxTopOfStack = ( StackType_t ) ( ( ( ( uint32_t ) pvParameters ) >> 8 ) & 0xFF00 );
 		pxTopOfStack--;
 
-		/* Write in the parameter value. */
-		pulLocal =  ( uint32_t * ) pxTopOfStack;
-		*pulLocal = ( uint32_t ) pvParameters;
+		/* An initial value for the HL register. */
+		*pxTopOfStack = ( StackType_t ) 0x2222;
 		pxTopOfStack--;
 
-		/* The return address, leaving space for the first two bytes of	the
-		32-bit value.  See the comments above the prvTaskExitError() prototype
-		at the top of this file. */
-		pxTopOfStack--;
-		pulLocal = ( uint32_t * ) pxTopOfStack;
-		*pulLocal = ( uint32_t ) prvTaskExitError;
+		/* CS and ES registers. */
+		*pxTopOfStack = ( StackType_t ) 0x0F00;
 		pxTopOfStack--;
 
-		/* The start address / PSW value is also written in as a 32-bit value,
-		so leave a space for the second two bytes. */
+		/* The lower 16-bit value of parameter is passed in DE. */
+		*pxTopOfStack = ( StackType_t ) ( ( ( uint32_t ) pvParameters ) & 0xFFFF );
 		pxTopOfStack--;
 
-		/* Task function start address combined with the PSW. */
-		pulLocal = ( uint32_t * ) pxTopOfStack;
-		*pulLocal = ( ( ( uint32_t ) pxCode ) | ( portPSW << 24UL ) );
-		pxTopOfStack--;
-
-		/* An initial value for the AX register. */
-		*pxTopOfStack = ( StackType_t ) 0x1111;
+		/* The remaining general purpose registers BC */
+		*pxTopOfStack = ( StackType_t ) 0xBCBC;
 		pxTopOfStack--;
 	}
 	#else
 	{
-		/* The return address, leaving space for the first two bytes of	the
-		32-bit value.  See the comments above the prvTaskExitError() prototype
-		at the top of this file. */
-		pxTopOfStack--;
-		pulLocal = ( uint32_t * ) pxTopOfStack;
-		*pulLocal = ( uint32_t ) prvTaskExitError;
-		pxTopOfStack--;
-
-		/* Task function.  Again as it is written as a 32-bit value a space is
-		left on the stack for the second two bytes. */
-		pxTopOfStack--;
-
-		/* Task function start address combined with the PSW. */
-		pulLocal = ( uint32_t * ) pxTopOfStack;
-		*pulLocal = ( ( ( uint32_t ) pxCode ) | ( portPSW << 24UL ) );
-		pxTopOfStack--;
-
 		/* The parameter is passed in AX. */
 		*pxTopOfStack = ( StackType_t ) pvParameters;
 		pxTopOfStack--;
+
+		/* An initial value for the HL register. */
+		*pxTopOfStack = ( StackType_t ) 0x2222;
+		pxTopOfStack--;
+
+		/* CS and ES registers. */
+		*pxTopOfStack = ( StackType_t ) 0x0F00;
+		pxTopOfStack--;
+
+		/* The remaining general purpose registers DE and BC */
+		*pxTopOfStack = ( StackType_t ) 0xDEDE;
+		pxTopOfStack--;
+		*pxTopOfStack = ( StackType_t ) 0xBCBC;
+		pxTopOfStack--;
 	}
 	#endif
-
-	/* An initial value for the HL register. */
-	*pxTopOfStack = ( StackType_t ) 0x2222;
-	pxTopOfStack--;
-
-	/* CS and ES registers. */
-	*pxTopOfStack = ( StackType_t ) 0x0F00;
-	pxTopOfStack--;
-
-	/* The remaining general purpose registers DE and BC */
-	*pxTopOfStack = ( StackType_t ) 0xDEDE;
-	pxTopOfStack--;
-	*pxTopOfStack = ( StackType_t ) 0xBCBC;
-	pxTopOfStack--;
 
 	/* Finally the critical section nesting count is set to zero when the task
 	first starts. */
@@ -227,12 +218,12 @@ void vPortEndScheduler( void )
 static void prvSetupTimerInterrupt( void )
 {
 const uint16_t usClockHz = 15000UL; /* Internal clock. */
-const uint16_t usCompareMatch = ( usClockHz / configTICK_RATE_HZ ) + 1UL;
+const uint16_t usCompareMatch = ( usClockHz / configTICK_RATE_HZ ) - 1UL;
 
 	/* Use the internal 15K clock. */
 	OSMC = ( uint8_t ) 0x16;
 
-	#ifdef RTCEN
+	#if INTIT_vect == 0x38
 	{
 		/* Supply the interval timer clock. */
 		RTCEN = ( uint8_t ) 1U;
@@ -252,9 +243,9 @@ const uint16_t usCompareMatch = ( usClockHz / configTICK_RATE_HZ ) + 1UL;
 		/* Enable INTIT interrupt. */
 		ITMK = ( uint8_t ) 0;
 	}
-	#endif
+	#endif /* if INTIT_vect == 0x38 */
 
-	#ifdef TMKAEN
+	#if INTIT_vect == 0x3C
 	{
 		/* Supply the interval timer clock. */
 		TMKAEN = ( uint8_t ) 1U;
@@ -274,7 +265,7 @@ const uint16_t usCompareMatch = ( usClockHz / configTICK_RATE_HZ ) + 1UL;
 		/* Enable INTIT interrupt. */
 		TMKAMK = ( uint8_t ) 0;
 	}
-	#endif
+	#endif /* if INTIT_vect == 0x3C */
 }
 /*-----------------------------------------------------------*/
 

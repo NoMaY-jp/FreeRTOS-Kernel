@@ -30,8 +30,8 @@
 
 ; Variables used by scheduler
 ;------------------------------------------------------------------------------
-	EXTERN    pxCurrentTCB
-	EXTERN    usCriticalNesting
+	EXTERN    _pxCurrentTCB
+	EXTERN    _usCriticalNesting
 
 ;------------------------------------------------------------------------------
 ;   portSAVE_CONTEXT MACRO
@@ -49,9 +49,9 @@ portSAVE_CONTEXT MACRO
 	PUSH      AX
 	PUSH      DE                    ; Save the remaining general purpose registers.
 	PUSH      BC
-	MOVW      AX, usCriticalNesting ; Save the usCriticalNesting value.
+	MOVW      AX, _usCriticalNesting; Save the usCriticalNesting value.
 	PUSH      AX
-	MOVW      AX, pxCurrentTCB 	    ; Save the Stack pointer.
+	MOVW      AX, _pxCurrentTCB 	; Save the Stack pointer.
 	MOVW      HL, AX
 	MOVW      AX, SP
 	MOVW      [HL], AX
@@ -65,12 +65,12 @@ portSAVE_CONTEXT MACRO
 ;   of the selected task from the task stack
 ;------------------------------------------------------------------------------
 portRESTORE_CONTEXT MACRO
-	MOVW      AX, pxCurrentTCB	    ; Restore the Stack pointer.
+	MOVW      AX, _pxCurrentTCB	    ; Restore the Stack pointer.
 	MOVW      HL, AX
 	MOVW      AX, [HL]
 	MOVW      SP, AX
 	POP	      AX	                ; Restore usCriticalNesting value.
-	MOVW      usCriticalNesting, AX
+	MOVW      _usCriticalNesting, AX
 	POP	      BC                    ; Restore the necessary general purpose registers.
 	POP	      DE
 	POP       AX                    ; Restore the ES register.
