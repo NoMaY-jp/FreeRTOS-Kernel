@@ -68,10 +68,11 @@ _vPortTickISR:
 	portSAVE_CONTEXT
 	/* Call the RTOS tick function. */
 	call      !!_xTaskIncrementTick
-#if configUSE_PREEMPTION == 1
 	/* Select the next task to run. */
+	clrw	ax
+	cmpw	ax, r8
+	skz
 	call      !!_vTaskSwitchContext
-#endif
 	/* Retore the context of whichever task will run next. */
 	portRESTORE_CONTEXT
 	reti

@@ -158,7 +158,7 @@ void vPortEndScheduler( void )
 __attribute__((weak)) void vApplicationSetupTimerInterrupt( void )
 {
 const uint16_t usClockHz = 15000UL; /* Internal clock. */
-const uint16_t usCompareMatch = ( usClockHz / configTICK_RATE_HZ ) + 1UL;
+const uint16_t usCompareMatch = ( usClockHz / configTICK_RATE_HZ ) - 1UL;
 
 	/* Use the internal 15K clock. */
 	OSMC = ( unsigned char ) 0x16;

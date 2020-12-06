@@ -25,6 +25,31 @@
  * 1 tab == 4 spaces!
  */
 
+	 r8    =    0xffef0
+	 r9    =    0xffef1
+	r10    =    0xffef2
+	r11    =    0xffef3
+	r12    =    0xffef4
+	r13    =    0xffef5
+	r14    =    0xffef6
+	r15    =    0xffef7
+	r16    =    0xffee8
+	r17    =    0xffee9
+	r18    =    0xffeea
+	r19    =    0xffeeb
+	r20    =    0xffeec
+	r21    =    0xffeed
+	r22    =    0xffeee
+	r23    =    0xffeef
+	r24    =    0xffee0
+	r25    =    0xffee1
+	r26    =    0xffee2
+	r27    =    0xffee3
+	r28    =    0xffee4
+	r29    =    0xffee5
+	r30    =    0xffee6
+	r31    =    0xffee7
+
 /* Variables used by scheduler */
 	.extern    _pxCurrentTCB
 	.extern    _usCriticalNesting
