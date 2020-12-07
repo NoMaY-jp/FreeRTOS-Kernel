@@ -99,66 +99,35 @@ StackType_t *pxPortInitialiseStack( StackType_t *pxTopOfStack, TaskFunction_t px
 {
 uint32_t *pulLocal;
 
-	/* With large code and large data sizeof( StackType_t ) == 2, and
-	sizeof( StackType_t * ) == 4.  With small code and small data
-	sizeof( StackType_t ) == 2 and sizeof( StackType_t * ) == 2. */
+	/* With large code sizeof( TaskFunction_t ) == 4.  With small code
+	sizeof( TaskFunction_t ) == 2. */
 
-//	#if __DATA_MODEL__ == __DATA_MODEL_FAR__
-//	{
-//		/* Parameters are passed in on the stack, and written using a 32-bit value
-//		hence a space is left for the second two bytes. */
-//		pxTopOfStack--;
-//
-//		/* Write in the parameter value. */
-//		pulLocal =  ( uint32_t * ) pxTopOfStack;
-//		*pulLocal = ( uint32_t ) pvParameters;
-//		pxTopOfStack--;
-//
-//		/* The return address, leaving space for the first two bytes of	the
-//		32-bit value.  See the comments above the prvTaskExitError() prototype
-//		at the top of this file. */
-//		pxTopOfStack--;
-//		pulLocal = ( uint32_t * ) pxTopOfStack;
-//		*pulLocal = ( uint32_t ) prvTaskExitError;
-//		pxTopOfStack--;
-//
-//		/* The start address / PSW value is also written in as a 32-bit value,
-//		so leave a space for the second two bytes. */
-//		pxTopOfStack--;
-//
-//		/* Task function start address combined with the PSW. */
-//		pulLocal = ( uint32_t * ) pxTopOfStack;
-//		*pulLocal = ( ( ( uint32_t ) pxCode ) | ( portPSW << 24UL ) );
-//		pxTopOfStack--;
-//
-//		/* An initial value for the AX register. */
-//		*pxTopOfStack = ( StackType_t ) 0x1111;
-//		pxTopOfStack--;
-//	}
-//	#else
-	{
-		/* The return address, leaving space for the first two bytes of	the
-		32-bit value.  See the comments above the prvTaskExitError() prototype
-		at the top of this file. */
-		pxTopOfStack--;
-		pulLocal = ( uint32_t * ) pxTopOfStack;
-		*pulLocal = ( uint32_t ) prvTaskExitError;
-		pxTopOfStack--;
+	/* The return address, leaving space for the first two bytes of	the
+	32-bit value.  See the comments above the prvTaskExitError() prototype
+	at the top of this file. */
+	pxTopOfStack--;
+	pulLocal = ( uint32_t * ) pxTopOfStack;
+	*pulLocal = ( uint32_t ) prvTaskExitError;
+	pxTopOfStack--;
 
-		/* Task function.  Again as it is written as a 32-bit value a space is
-		left on the stack for the second two bytes. */
-		pxTopOfStack--;
+	/* Task function.  Again as it is written as a 32-bit value a space is
+	left on the stack for the second two bytes. */
+	pxTopOfStack--;
 
-		/* Task function start address combined with the PSW. */
-		pulLocal = ( uint32_t * ) pxTopOfStack;
-		*pulLocal = ( ( ( uint32_t ) pxCode ) | ( portPSW << 24UL ) );
-		pxTopOfStack--;
+	/* Task function start address combined with the PSW. */
+	pulLocal = ( uint32_t * ) pxTopOfStack;
+#ifdef __RL78_SMALL__
+	/* Cast from 16bits pointer to 32bits value is potentially not safe. */
+	*pulLocal = ( ( ( uint32_t ) ( uint16_t ) pxCode ) | ( portPSW << 24UL ) );
+#else /* __RL78_MEDIUM__ */
+	/* Cast from 32bits (actually 24bits) pointer to 32bits value is safe. */
+	*pulLocal = ( ( ( uint32_t ) pxCode ) | ( portPSW << 24UL ) );
+#endif
+	pxTopOfStack--;
 
-		/* The parameter is passed in AX. */
-		*pxTopOfStack = ( StackType_t ) pvParameters;
-		pxTopOfStack--;
-	}
-//	#endif
+	/* The parameter is passed in AX. */
+	*pxTopOfStack = ( StackType_t ) pvParameters;
+	pxTopOfStack--;
 
 	/* An initial value for the HL register. */
 	*pxTopOfStack = ( StackType_t ) 0x2222;

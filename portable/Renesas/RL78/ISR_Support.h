@@ -84,6 +84,10 @@ portRESTORE_CONTEXT .MACRO
 ;------------------------------------------------------------------------------
 ;   call@ MACRO
 ;   Calls subroutine using preferred addressing mode depending on memory model
+;   Note that __RL78_SMALL__ or __RL78_MEDIUM__ are not automatically defined
+;   therefore these definition have to be defined by assembler -define option,
+;   but __RL78_S1__, __RL78_S2__ or __RL78_S3__ are automatically defined by
+;   assembler -dev option or -cpu option which (at least either) are required
 ;------------------------------------------------------------------------------
 call@ .MACRO subroutine
 $ifdef __RL78_SMALL__

@@ -105,7 +105,7 @@ uint32_t *pulLocal;
 
 	/* Task function start address combined with the PSW. */
 	pulLocal = ( uint32_t * ) pxTopOfStack;
-	*pulLocal = ( ( ( uint32_t ) pxCode ) | ( portPSW << 24UL ) );
+	*pulLocal = ( ( ( uint32_t ) ( uint16_t ) pxCode ) | ( portPSW << 24UL ) );
 	pxTopOfStack--;
 
 	/* An initial value for the AX register. */
