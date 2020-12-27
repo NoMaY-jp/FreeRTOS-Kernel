@@ -35,20 +35,22 @@
 
 ;------------------------------------------------------------------------------
 ;   portSAVE_CONTEXT MACRO
-;   Saves the context of the general purpose registers, CS and ES (only in far
-;	memory mode) registers the usCriticalNesting Value and the Stack Pointer
-;   of the active Task onto the task stack
+;   Saves the context of the general purpose registers, CS and ES registers,
+;   the usCriticalNesting Value and the Stack Pointer of the active Task
+;   onto the task stack
 ;------------------------------------------------------------------------------
 portSAVE_CONTEXT MACRO
-
-	PUSH      AX                    ; Save AX Register to stack.
+	PUSH      AX                    ; Save the general purpose registers.
+	PUSH      BC
+	PUSH      DE
 	PUSH      HL
+	; The following ICCRL78 compatible code doesn't work with Renesas RL78 simulator.
+	; MOVW    AX, 0xFFFFC           ; Save the ES and CS register.
+	; So the following code is used.
 	MOV       A, CS                 ; Save CS register.
-	XCH       A, X
+	MOV       X, A
 	MOV       A, ES                 ; Save ES register.
 	PUSH      AX
-	PUSH      DE                    ; Save the remaining general purpose registers.
-	PUSH      BC
 	MOVW      AX, _usCriticalNesting; Save the usCriticalNesting value.
 	PUSH      AX
 	MOVW      AX, _pxCurrentTCB 	; Save the Stack pointer.
@@ -61,8 +63,8 @@ portSAVE_CONTEXT MACRO
 ;------------------------------------------------------------------------------
 ;   portRESTORE_CONTEXT MACRO
 ;   Restores the task Stack Pointer then use this to restore usCriticalNesting,
-;   general purpose registers and the CS and ES (only in far memory mode)
-;   of the selected task from the task stack
+;   general purpose registers and the CS and ES registers of the selected task
+;   from the task stack
 ;------------------------------------------------------------------------------
 portRESTORE_CONTEXT MACRO
 	MOVW      AX, _pxCurrentTCB	    ; Restore the Stack pointer.
@@ -71,13 +73,47 @@ portRESTORE_CONTEXT MACRO
 	MOVW      SP, AX
 	POP	      AX	                ; Restore usCriticalNesting value.
 	MOVW      _usCriticalNesting, AX
-	POP	      BC                    ; Restore the necessary general purpose registers.
-	POP	      DE
-	POP       AX                    ; Restore the ES register.
-	MOV       ES, A
-	XCH       A, X                  ; Restore the CS register.
-	MOV       CS, A
-	POP       HL                    ; Restore general purpose register HL.
-	POP       AX                    ; Restore AX.
+	POP       AX
+	; The following ICCRL78 compatible code doesn't work with Renesas RL78 simulator.
+	; MOVW    0xFFFFC, AX           ; Restore the ES and CS register.
+	; So the following code is used.
+	MOV       ES, A                 ; Restore the ES register.
+	MOV       A, X
+	MOV       CS, A                 ; Restore the CS register.
+	POP       HL                    ; Restore general purpose registers.
+	POP       DE
+	POP       BC
+	POP       AX
+	ENDM
+;------------------------------------------------------------------------------
+
+;------------------------------------------------------------------------------
+;   portSAVE_CONTEXT_C MACRO
+;   Saves the context of the general purpose registers, CS and ES registers,
+;   the usCriticalNesting Value and the Stack Pointer of the active Task
+;   onto the task stack
+;------------------------------------------------------------------------------
+portSAVE_CONTEXT_C MACRO
+;	It is assumed that the general purpose registers, CS and ES registers
+;	have been saved as follows at the beginning of an interrupt function.
+;	PUSH      AX
+;	PUSH      BC
+;	PUSH      DE
+;	PUSH      HL
+;	; The following ICCRL78 compatible code doesn't work with Renesas RL78 simulator.
+;	; MOVW    AX, 0xFFFFC           ; Save the ES and CS register.
+;	; So the following code is used.
+;	MOV       A, CS                 ; Save CS register.
+;	MOV       X, A
+;	MOV       A, ES                 ; Save ES register.
+;	PUSH      AX
+;	Saves the context of the general purpose registers, CS and ES registers,
+;	the usCriticalNesting Value and the Stack Pointer of the active Task
+	MOVW      AX, _usCriticalNesting; Save the usCriticalNesting value.
+	PUSH      AX
+	MOVW      AX, _pxCurrentTCB     ; Save the Stack pointer.
+	MOVW      HL, AX
+	MOVW      AX, SP
+	MOVW      [HL], AX
 	ENDM
 ;------------------------------------------------------------------------------

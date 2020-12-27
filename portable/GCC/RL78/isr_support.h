@@ -56,26 +56,25 @@
 
 /*
  * portSAVE_CONTEXT MACRO
- * Saves the context of the general purpose registers, CS and ES (only in far
- * memory mode) registers the usCriticalNesting Value and the Stack Pointer
- * of the active Task onto the task stack
+ * Saves the context of the general purpose registers, CS and ES registers,
+ * the usCriticalNesting Value and the Stack Pointer of the active Task
+ * onto the task stack
  */
 	.macro portSAVE_CONTEXT
 
 	SEL 	RB0
 
-	/* Save AX Register to stack. */
+	/* Save the register bank 0. */
 	PUSH	AX
+	PUSH	BC
+	PUSH	DE
 	PUSH	HL
 	/* Save CS register. */
 	MOV 	A, CS
-	XCH		A, X
+	MOV		X, A
 	/* Save ES register. */
 	MOV		A, ES
 	PUSH	AX
-	/* Save the remaining general purpose registers from bank 0. */
-	PUSH	DE
-	PUSH	BC
 	/* Save the other register banks - only necessary in the GCC port. */
 	SEL		RB1
 	PUSH	AX
@@ -106,8 +105,8 @@
 /*
  * portRESTORE_CONTEXT MACRO
  * Restores the task Stack Pointer then use this to restore usCriticalNesting,
- * general purpose registers and the CS and ES (only in far memory mode)
- * of the selected task from the task stack
+ * general purpose registers and the CS and ES of the selected task
+ * from the task stack
  */
 .macro portRESTORE_CONTEXT MACRO
 	SEL		RB0
@@ -133,19 +132,64 @@
 	POP		BC
 	POP		AX
 	SEL		RB0
-	/* Restore the necessary general purpose registers. */
-	POP		BC
-	POP		DE
 	/* Restore the ES register. */
 	POP		AX
 	MOV		ES, A
 	/* Restore the CS register. */
-	XCH		A, X
+	MOV		A, X
 	MOV		CS, A
-	/* Restore general purpose register HL. */
+	/* Save the register bank 0. */
 	POP		HL
-	/* Restore AX. */
+	POP		DE
+	POP		BC
 	POP		AX
+
+	.endm
+
+/*
+ * portSAVE_CONTEXT_C MACRO
+ * Saves the context of the general purpose registers, the ES register,
+ * the usCriticalNesting Value and the Stack Pointer of the active Task
+ * onto the task stack
+ */
+.macro portSAVE_CONTEXT_C MACRO
+
+	/* It is assumed that the registers of bank 0 and the ES register
+	have been saved as follows at the beginning of an interrupt function.
+	SEL		RB0
+	PUSH	AX
+	PUSH	BC
+	PUSH	DE
+	PUSH	HL
+	MOV		A, ES
+	PUSH	AX
+	*/
+	/* Save CS register. */
+	MOV 	A, CS
+	MOV		[SP], A
+	/* Save the other register banks - only necessary in the GCC port. */
+	SEL		RB1
+	PUSH	AX
+	PUSH	BC
+	PUSH	DE
+	PUSH	HL
+	SEL		RB2
+	PUSH	AX
+	PUSH	BC
+	PUSH	DE
+	PUSH	HL
+	/* Registers in bank 3 are for ISR use only so don't need saving. */
+	SEL		RB0
+	/* Save the usCriticalNesting value. */
+	MOVW	AX, !_usCriticalNesting
+	PUSH	AX
+	/* Save the Stack pointer. */
+	MOVW	AX, !_pxCurrentTCB
+	MOVW	HL, AX
+	MOVW	AX, SP
+	MOVW	[HL], AX
+	/* Switch stack pointers. */
+	movw sp,#_stack /* Set stack pointer */
 
 	.endm
 

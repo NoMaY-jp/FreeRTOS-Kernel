@@ -34,10 +34,10 @@ interrupts don't accidentally become enabled before the scheduler is started. */
 #define portINITIAL_CRITICAL_NESTING  ( ( uint16_t ) 10 )
 
 /* Initial PSW value allocated to a newly created task.
- *   1100011000000000
- *   ||||||||-------------- Fill byte
- *   |||||||--------------- Carry Flag cleared
- *   |||||----------------- In-service priority Flags set to low level
+ *   11000110
+ *   ||||||||-------------- Carry Flag cleared
+ *   |||||||--------------- In-service priority 0 Flags set to low priority
+ *   |||||----------------- In-service priority 1 Flags set to low priority
  *   ||||------------------ Register bank Select 0 Flag cleared
  *   |||------------------- Auxiliary Carry Flag cleared
  *   ||-------------------- Register bank Select 1 Flag cleared
@@ -129,18 +129,16 @@ uint32_t *pulLocal;
 	*pxTopOfStack = ( StackType_t ) pvParameters;
 	pxTopOfStack--;
 
-	/* An initial value for the HL register. */
+	/* The initial value for the general purpose register BC, DE and HL. */
+	*pxTopOfStack = ( StackType_t ) 0xBCBC;
+	pxTopOfStack--;
+	*pxTopOfStack = ( StackType_t ) 0xDEDE;
+	pxTopOfStack--;
 	*pxTopOfStack = ( StackType_t ) 0x2222;
 	pxTopOfStack--;
 
-	/* CS and ES registers. */
-	*pxTopOfStack = ( StackType_t ) 0x0F00;
-	pxTopOfStack--;
-
-	/* The remaining general purpose registers DE and BC */
-	*pxTopOfStack = ( StackType_t ) 0xDEDE;
-	pxTopOfStack--;
-	*pxTopOfStack = ( StackType_t ) 0xBCBC;
+	/* ES and CS registers. */
+	*pxTopOfStack = ( StackType_t ) 0x000F;
 	pxTopOfStack--;
 
 	/* Finally the critical section nesting count is set to zero when the task

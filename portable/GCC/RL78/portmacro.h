@@ -28,6 +28,10 @@
 #ifndef PORTMACRO_H
 #define PORTMACRO_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /*-----------------------------------------------------------
  * Port specific definitions.
  *
@@ -116,6 +120,10 @@ extern volatile uint16_t usCriticalNesting;										\
 /* Task function macros as described on the FreeRTOS.org WEB site. */
 #define portTASK_FUNCTION_PROTO( vFunction, pvParameters ) void vFunction( void *pvParameters )
 #define portTASK_FUNCTION( vFunction, pvParameters ) void vFunction( void *pvParameters )
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* PORTMACRO_H */
 

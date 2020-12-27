@@ -35,9 +35,9 @@ interrupts don't accidentally become enabled before the scheduler is started. */
 
 /* Initial PSW value allocated to a newly created task.
  *   11000110
- *   ||||||||-------------- Fill byte
- *   |||||||--------------- Carry Flag cleared
- *   |||||----------------- In-service priority Flags set to low level
+ *   ||||||||-------------- Carry Flag cleared
+ *   |||||||--------------- In-service priority 0 Flags set to low priority
+ *   |||||----------------- In-service priority 1 Flags set to low priority
  *   ||||------------------ Register bank Select 0 Flag cleared
  *   |||------------------- Auxiliary Carry Flag cleared
  *   ||-------------------- Register bank Select 1 Flag cleared
@@ -59,9 +59,17 @@ volatile uint16_t usCriticalNesting = portINITIAL_CRITICAL_NESTING;
 /*-----------------------------------------------------------*/
 
 /*
- * Sets up the periodic ISR used for the RTOS tick.
+ * Sets up the periodic ISR used for the RTOS tick using the interval timer.
+ * The application writer can define configSETUP_TICK_INTERRUPT() (in
+ * FreeRTOSConfig.h) such that their own tick interrupt configuration is used
+ * in place of prvSetupTimerInterrupt().
  */
-__attribute__((weak)) void vApplicationSetupTimerInterrupt( void );
+static void prvSetupTimerInterrupt( void );
+#ifndef configSETUP_TICK_INTERRUPT
+	/* The user has not provided their own tick interrupt configuration so use
+    the definition in this file (which uses the interval timer). */
+	#define configSETUP_TICK_INTERRUPT() prvSetupTimerInterrupt()
+#endif /* configSETUP_TICK_INTERRUPT */
 
 /*
  * Starts the scheduler by loading the context of the first task to run.
@@ -103,16 +111,19 @@ uint32_t *pulLocal;
 	so leave a space for the second two bytes. */
 	pxTopOfStack--;
 
-	/* Task function start address combined with the PSW. */
+	/* Task function start address combined with the PSW. The GNURL78 always
+	uses 16 bits function pointer. */
 	pulLocal = ( uint32_t * ) pxTopOfStack;
 	*pulLocal = ( ( ( uint32_t ) ( uint16_t ) pxCode ) | ( portPSW << 24UL ) );
 	pxTopOfStack--;
 
-	/* An initial value for the AX register. */
+	/* Initial values for the AX, BC, DE and HL register of bank 0. */
 	*pxTopOfStack = ( StackType_t ) 0x1111;
 	pxTopOfStack--;
-
-	/* An initial value for the HL register. */
+	*pxTopOfStack = ( StackType_t ) 0xBCBC;
+	pxTopOfStack--;
+	*pxTopOfStack = ( StackType_t ) 0xDEDE;
+	pxTopOfStack--;
 	*pxTopOfStack = ( StackType_t ) 0x2222;
 	pxTopOfStack--;
 
@@ -120,10 +131,9 @@ uint32_t *pulLocal;
 	*pxTopOfStack = ( StackType_t ) 0x0F00;
 	pxTopOfStack--;
 
-	/* The remaining general purpose registers bank 0 (DE and BC) and the other
-	two register banks...register bank 3 is dedicated for use by interrupts so
-	is not saved as part of the task context. */
-	pxTopOfStack -= 10;
+	/* The other two register banks...register bank 3 is dedicated for use
+	by interrupts so is not saved as part of the task context. */
+	pxTopOfStack -= 8;
 
 	/* Finally the critical section nesting count is set to zero when the task
 	first starts. */
@@ -139,12 +149,18 @@ portBASE_TYPE xPortStartScheduler( void )
 {
 	/* Setup the hardware to generate the tick.  Interrupts are disabled when
 	this function is called. */
-	vApplicationSetupTimerInterrupt();
+	configSETUP_TICK_INTERRUPT();
 
 	/* Restore the context of the first task that is going to run. */
 	vPortStartFirstTask();
 
-	/* Execution should not reach here as the tasks are now running! */
+	/* Execution should not reach here as the tasks are now running!
+	prvSetupTimerInterrupt() is called here to prevent the compiler outputting
+	a warning about a statically declared function not being referenced in the
+	case that the application writer has provided their own tick interrupt
+	configuration routine (and defined configSETUP_TICK_INTERRUPT() such that
+	their own routine will be called in place of prvSetupTimerInterrupt()). */
+	prvSetupTimerInterrupt();
 	return pdTRUE;
 }
 /*-----------------------------------------------------------*/
@@ -155,7 +171,7 @@ void vPortEndScheduler( void )
 }
 /*-----------------------------------------------------------*/
 
-__attribute__((weak)) void vApplicationSetupTimerInterrupt( void )
+static void prvSetupTimerInterrupt( void )
 {
 const uint16_t usClockHz = 15000UL; /* Internal clock. */
 const uint16_t usCompareMatch = ( usClockHz / configTICK_RATE_HZ ) - 1UL;

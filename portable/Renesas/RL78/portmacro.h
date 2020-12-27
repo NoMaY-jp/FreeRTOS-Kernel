@@ -44,14 +44,6 @@ extern "C" {
  *-----------------------------------------------------------
  */
 
-//#if __DATA_MODEL__ == __DATA_MODEL_FAR__ && __CODE_MODEL__ == __CODE_MODEL_NEAR__
-//	#warning This port has not been tested with your selected memory model combination. If a far data model is required it is recommended to also use a far code model.
-//#endif
-
-//#if __DATA_MODEL__ == __DATA_MODEL_NEAR__ && __CODE_MODEL__ == __CODE_MODEL_FAR__
-//	#warning This port has not been tested with your selected memory model combination. If a far code model is required it is recommended to also use a far data model.
-//#endif
-
 /* Type definitions. */
 
 #define portCHAR        char
@@ -66,13 +58,7 @@ typedef portSTACK_TYPE StackType_t;
 typedef short BaseType_t;
 typedef unsigned short UBaseType_t;
 
-
-//#if __DATA_MODEL__ == __DATA_MODEL_FAR__
-//	#define portPOINTER_SIZE_TYPE uint32_t
-//#else
-	#define portPOINTER_SIZE_TYPE uint16_t
-//#endif
-
+#define portPOINTER_SIZE_TYPE uint16_t
 
 #if ( configUSE_16_BIT_TICKS == 1 )
 	typedef unsigned int TickType_t;

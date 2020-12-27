@@ -51,6 +51,7 @@
 	PUBLIC	  _vPortYield
 	PUBLIC    _vPortStartFirstTask
 	PUBLIC    _vPortTickISR
+	PUBLIC    _vPortFreeRTOSInterruptCommonHandler_C
 
 	PUBLIC	  ___interrupt_0x7E
 	PUBLIC	  ___interrupt_TICK_VECTOR
@@ -87,6 +88,19 @@ ___interrupt_TICK_VECTOR:
 	cmpw	ax, #0x00
 	skz
 	call	_vTaskSwitchContext    ; Call the scheduler to select the next task.
+	portRESTORE_CONTEXT		       ; Restore the context of the next task to run.
+	reti
+
+
+; Common interrupt handler.
+	 RSEG CODE:CODE
+_vPortFreeRTOSInterruptCommonHandler_C:
+	; Argument: BC is the target interrupt handler address.
+	portSAVE_CONTEXT_C		       ; Save the context of the current task.
+	; Call the target interrupt handler.
+	clrb	a
+	mov		cs, a
+	call	bc					   ; Call the target interrupt handler.
 	portRESTORE_CONTEXT		       ; Restore the context of the next task to run.
 	reti
 
