@@ -64,12 +64,11 @@ volatile uint16_t usCriticalNesting = portINITIAL_CRITICAL_NESTING;
  * FreeRTOSConfig.h) such that their own tick interrupt configuration is used
  * in place of prvSetupTimerInterrupt().
  */
-static void prvSetupTimerInterrupt( void );
 #ifndef configSETUP_TICK_INTERRUPT
 	/* The user has not provided their own tick interrupt configuration so use
-    the definition in this file (which uses the interval timer). */
-	#define configSETUP_TICK_INTERRUPT() prvSetupTimerInterrupt()
-#endif /* configSETUP_TICK_INTERRUPT */
+	the definition in this file (which uses the interval timer). */
+	static void prvSetupTimerInterrupt( void );
+#endif
 
 /*
  * Starts the scheduler by loading the context of the first task to run.
@@ -149,18 +148,15 @@ portBASE_TYPE xPortStartScheduler( void )
 {
 	/* Setup the hardware to generate the tick.  Interrupts are disabled when
 	this function is called. */
+#ifdef configSETUP_TICK_INTERRUPT
 	configSETUP_TICK_INTERRUPT();
+#else
+	prvSetupTimerInterrupt();
+#endif
 
 	/* Restore the context of the first task that is going to run. */
 	vPortStartFirstTask();
 
-	/* Execution should not reach here as the tasks are now running!
-	prvSetupTimerInterrupt() is called here to prevent the compiler outputting
-	a warning about a statically declared function not being referenced in the
-	case that the application writer has provided their own tick interrupt
-	configuration routine (and defined configSETUP_TICK_INTERRUPT() such that
-	their own routine will be called in place of prvSetupTimerInterrupt()). */
-	prvSetupTimerInterrupt();
 	return pdTRUE;
 }
 /*-----------------------------------------------------------*/
@@ -171,6 +167,7 @@ void vPortEndScheduler( void )
 }
 /*-----------------------------------------------------------*/
 
+#ifndef configSETUP_TICK_INTERRUPT
 static void prvSetupTimerInterrupt( void )
 {
 const uint16_t usClockHz = 15000UL; /* Internal clock. */
@@ -179,7 +176,7 @@ const uint16_t usCompareMatch = ( usClockHz / configTICK_RATE_HZ ) - 1UL;
 	/* Use the internal 15K clock. */
 	OSMC = ( unsigned char ) 0x16;
 
-	#ifdef RTCEN
+	#if INTIT_vect == 0x38
 	{
 		/* Supply the interval timer clock. */
 		RTCEN = ( unsigned char ) 1U;
@@ -201,7 +198,7 @@ const uint16_t usCompareMatch = ( usClockHz / configTICK_RATE_HZ ) - 1UL;
 	}
 	#endif
 
-	#ifdef TMKAEN
+	#if INTIT_vect == 0x3C
 	{
 		/* Supply the interval timer clock. */
 		TMKAEN = ( unsigned char ) 1U;
@@ -223,5 +220,6 @@ const uint16_t usCompareMatch = ( usClockHz / configTICK_RATE_HZ ) - 1UL;
 	}
 	#endif
 }
+#endif /* ifndef configSETUP_TICK_INTERRUPT */
 /*-----------------------------------------------------------*/
 
