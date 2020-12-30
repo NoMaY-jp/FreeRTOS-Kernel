@@ -88,6 +88,9 @@
 	PUSH	HL
 	/* Registers in bank 3 are for ISR use only so don't need saving. */
 	SEL		RB0
+	/* Set CS register to 0 - only necessary in the GCC port. */
+	CLRB	A
+	MOV		CS, A
 	/* Save the usCriticalNesting value. */
 	MOVW	AX, !_usCriticalNesting
 	PUSH	AX
@@ -180,6 +183,9 @@
 	PUSH	HL
 	/* Registers in bank 3 are for ISR use only so don't need saving. */
 	SEL		RB0
+	/* Set CS register to 0 - only necessary in the GCC port. */
+	CLRB	A
+	MOV		CS, A
 	/* Save the usCriticalNesting value. */
 	MOVW	AX, !_usCriticalNesting
 	PUSH	AX
