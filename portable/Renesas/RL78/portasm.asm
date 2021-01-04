@@ -42,6 +42,10 @@ $include "ISR_Support.h"
 ; handler.
 	.SECTION .text,TEXT
 _vPortYield:
+	clr1	psw.1			        ; Mask the tick interrupt and interrupts which
+							        ; call FreeRTOS API functions ending with FromISR.
+	ei						        ; Re-enable high priority interrupts but which
+							        ; cannot call FreeRTOS API functions in ISR.
 	portSAVE_CONTEXT		        ; Save the context of the current task.
 	call@      _vTaskSwitchContext  ; Call the scheduler to select the next task.
 	portRESTORE_CONTEXT		        ; Restore the context of the next task to run.
@@ -60,6 +64,8 @@ _vPortStartFirstTask:
 ; handler.
 	.SECTION .text,TEXT
 _vPortTickISR:
+	ei						       ; Re-enable high priority interrupts but which
+							       ; cannot call FreeRTOS API functions in ISR.
 	portSAVE_CONTEXT		       ; Save the context of the current task.
 	call@	_xTaskIncrementTick    ; Call the timer tick function.
 	cmpw	ax, #0x00

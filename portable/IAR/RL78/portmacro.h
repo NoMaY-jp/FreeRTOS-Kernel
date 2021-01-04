@@ -28,6 +28,9 @@
 #ifndef PORTMACRO_H
 #define PORTMACRO_H
 
+/* Hardware specifics. */
+#include <intrinsics.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -82,8 +85,22 @@ typedef unsigned short UBaseType_t;
 /*-----------------------------------------------------------*/
 
 /* Interrupt control macros. */
-#define portDISABLE_INTERRUPTS() __asm ( "DI" )
-#define portENABLE_INTERRUPTS()	 __asm ( "EI" )
+
+/* These macros should not be called directly, but through the
+ * taskENTER_CRITICAL() and taskEXIT_CRITICAL() macros.  A check is performed
+ * if configASSERT() is defined to ensure the ISP value was found to be 2
+ * when an ISR safe FreeRTOS API function was executed.  ISR safe FreeRTOS API
+ * functions are those that end in FromISR.  FreeRTOS maintains a separate
+ * interrupt API to ensure API function and interrupt entry is as fast and as
+ * simple as possible. */
+
+/* Change { PSW.ISP1, PSW.ISP0 } = { PSW.2, PSW.1 } : { 1, 1 } --> { 1, 0 }. */
+#define portDISABLE_INTERRUPTS() __asm ( "CLR1 PSW.1" )
+/* Change { PSW.ISP1, PSW.ISP0 } = { PSW.2, PSW.1 } : { 1, 0 } --> { 1, 1 }. */
+#define portENABLE_INTERRUPTS()  __asm ( "SET1	PSW.1" )
+#ifdef configASSERT
+	#define portASSERT_IF_INTERRUPT_PRIORITY_INVALID()	configASSERT( __get_interrupt_level() == 2 )
+#endif
 /*-----------------------------------------------------------*/
 
 /* Critical section control macros. */

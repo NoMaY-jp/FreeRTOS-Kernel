@@ -34,6 +34,7 @@
 ;------------------------------------------------------------------------------
 	.EXTERN    _pxCurrentTCB
 	.EXTERN    _usCriticalNesting
+	.EXTERN    __STACK_ADDR_START
 
 ;------------------------------------------------------------------------------
 ;   portSAVE_CONTEXT MACRO
@@ -56,9 +57,10 @@ portSAVE_CONTEXT .MACRO
 	MOVW      HL, AX
 	MOVW      AX, SP
 	MOVW      [HL], AX
-;	/* Switch stack pointers. */ ; The GNURL78 port has this. Why? (NoMaY-jp).
-;	;;MOVW      SP, #_stack /* Set stack pointer */ ; GNURL78
-;	MOVW      SP, #LOWW(__STACK_ADDR_START) /* Set stack pointer */ ; CC-RL
+;	Switch stack pointers. Interrupts which call FreeRTOS API functions
+;	ending with FromISR cannot be nested. On the other hand, high priority
+;	interrupts which does not call FreeRTOS API functions can be nested.
+	MOVW      SP, #LOWW(__STACK_ADDR_START)     ; Set stack pointer
 	.ENDM
 ;------------------------------------------------------------------------------
 
@@ -103,17 +105,17 @@ portSAVE_CONTEXT_C .MACRO
 ;	MOV       X, A
 ;	MOV       A, CS
 ;	PUSH      AX 
-;   Saves the context of the general purpose registers, CS and ES registers,
-;   the usCriticalNesting Value and the Stack Pointer of the active Task
+;   Saves the usCriticalNesting Value and the Stack Pointer.
 	MOVW      AX, !_usCriticalNesting   ; Save the usCriticalNesting value.
 	PUSH      AX
 	MOVW      AX, !_pxCurrentTCB    ; Save the Stack pointer.
 	MOVW      HL, AX
 	MOVW      AX, SP
 	MOVW      [HL], AX
-;	/* Switch stack pointers. */ ; The GNURL78 port has this. Why? (NoMaY-jp).
-;	;;MOVW      SP, #_stack /* Set stack pointer */ ; GNURL78
-;	MOVW      SP, #LOWW(__STACK_ADDR_START) /* Set stack pointer */ ; CC-RL
+;	Switch stack pointers. Interrupts which call FreeRTOS API functions
+;	ending with FromISR cannot be nested. On the other hand, high priority
+;	interrupts which does not call FreeRTOS API functions can be nested.
+	MOVW      SP, #LOWW(__STACK_ADDR_START)     ; Set stack pointer
 	.ENDM
 ;------------------------------------------------------------------------------
 

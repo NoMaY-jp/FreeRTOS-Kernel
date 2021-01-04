@@ -53,6 +53,7 @@
 /* Variables used by scheduler */
 	.extern    _pxCurrentTCB
 	.extern    _usCriticalNesting
+	.extern    _stack
 
 /*
  * portSAVE_CONTEXT MACRO
@@ -99,7 +100,9 @@
 	MOVW	HL, AX
 	MOVW	AX, SP
 	MOVW	[HL], AX
-	/* Switch stack pointers. */
+	/* Switch stack pointers. Interrupts which call FreeRTOS API functions
+	 * ending with FromISR cannot be nested. On the other hand, high priority
+	 * interrupts which does not call FreeRTOS API functions can be nested. */
 	movw sp,#_stack /* Set stack pointer */
 
 	.endm
@@ -157,19 +160,19 @@
  */
 .macro portSAVE_CONTEXT_C MACRO
 
-	/* It is assumed that the registers of bank 0 and the ES register
-	have been saved as follows at the beginning of an interrupt function.
+	/* It is assumed that the following registers have been saved.
 	SEL		RB0
 	PUSH	AX
 	PUSH	BC
+	*/
 	PUSH	DE
 	PUSH	HL
-	MOV		A, ES
-	PUSH	AX
-	*/
 	/* Save CS register. */
 	MOV 	A, CS
-	MOV		[SP], A
+	MOV		X, A
+	/* Save ES register. */
+	MOV		A, ES
+	PUSH	AX
 	/* Save the other register banks - only necessary in the GCC port. */
 	SEL		RB1
 	PUSH	AX
@@ -194,7 +197,9 @@
 	MOVW	HL, AX
 	MOVW	AX, SP
 	MOVW	[HL], AX
-	/* Switch stack pointers. */
+	/* Switch stack pointers. Interrupts which call FreeRTOS API functions
+	 * ending with FromISR cannot be nested. On the other hand, high priority
+	 * interrupts which does not call FreeRTOS API functions can be nested. */
 	movw sp,#_stack /* Set stack pointer */
 
 	.endm

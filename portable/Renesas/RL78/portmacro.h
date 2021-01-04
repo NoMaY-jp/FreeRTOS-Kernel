@@ -70,8 +70,46 @@ typedef unsigned short UBaseType_t;
 /*-----------------------------------------------------------*/
 
 /* Interrupt control macros. */
-#define portDISABLE_INTERRUPTS() __DI()
-#define portENABLE_INTERRUPTS()	 __EI()
+
+/* These macros should not be called directly, but through the
+ * taskENTER_CRITICAL() and taskEXIT_CRITICAL() macros.  A check is performed
+ * if configASSERT() is defined to ensure the ISP value was found to be 2
+ * when an ISR safe FreeRTOS API function was executed.  ISR safe FreeRTOS API
+ * functions are those that end in FromISR.  FreeRTOS maintains a separate
+ * interrupt API to ensure API function and interrupt entry is as fast and as
+ * simple as possible. */
+#pragma inline_asm vPortDISABLE_INTERRUPTS
+static void vPortDISABLE_INTERRUPTS( void )
+{
+#ifndef __CDT_PARSER__
+	/* Change { PSW.ISP1, PSW.ISP0 } = { PSW.2, PSW.1 } : { 1, 1 } --> { 1, 0 }. */
+	CLR1	PSW.1
+#endif
+}
+#pragma inline_asm vPortENABLE_INTERRUPTS
+static void vPortENABLE_INTERRUPTS( void )
+{
+#ifndef __CDT_PARSER__
+	/* Change { PSW.ISP1, PSW.ISP0 } = { PSW.2, PSW.1 } : { 1, 0 } --> { 1, 1 }. */
+	SET1	PSW.1
+#endif
+}
+#pragma inline_asm vPortGET_ISP
+static uint8_t vPortGET_ISP( void )
+{
+#ifndef __CDT_PARSER__
+	/* Return { PSW.ISP1, PSW.ISP0 } = { PSW.2, PSW.1 }. */
+	MOV		A, PSW
+	SHR		A, 1
+	AND		A, #3
+#endif
+}
+
+#define portDISABLE_INTERRUPTS()						vPortDISABLE_INTERRUPTS()
+#define portENABLE_INTERRUPTS()							vPortENABLE_INTERRUPTS()
+#ifdef configASSERT
+	#define portASSERT_IF_INTERRUPT_PRIORITY_INVALID()	configASSERT( vPortGET_ISP() == 2 )
+#endif
 /*-----------------------------------------------------------*/
 
 /* Critical section control macros. */

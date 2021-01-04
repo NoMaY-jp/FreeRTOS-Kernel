@@ -32,6 +32,7 @@
 ;------------------------------------------------------------------------------
 	EXTERN    _pxCurrentTCB
 	EXTERN    _usCriticalNesting
+	EXTERN    CSTACK$$Limit
 
 ;------------------------------------------------------------------------------
 ;   portSAVE_CONTEXT MACRO
@@ -57,6 +58,10 @@ portSAVE_CONTEXT MACRO
 	MOVW      HL, AX
 	MOVW      AX, SP
 	MOVW      [HL], AX
+;	Switch stack pointers. Interrupts which call FreeRTOS API functions
+;	ending with FromISR cannot be nested. On the other hand, high priority
+;	interrupts which does not call FreeRTOS API functions can be nested.
+	MOVW      SP, #LWRD(CSTACK$$Limit)     ; Set stack pointer
 	ENDM
 ;------------------------------------------------------------------------------
 
@@ -115,5 +120,9 @@ portSAVE_CONTEXT_C MACRO
 	MOVW      HL, AX
 	MOVW      AX, SP
 	MOVW      [HL], AX
+;	Switch stack pointers. Interrupts which call FreeRTOS API functions
+;	ending with FromISR cannot be nested. On the other hand, high priority
+;	interrupts which does not call FreeRTOS API functions can be nested.
+	MOVW      SP, #LWRD(CSTACK$$Limit)     ; Set stack pointer
 	ENDM
 ;------------------------------------------------------------------------------

@@ -36,12 +36,18 @@
 	.extern    _vTaskSwitchContext
 	.extern    _xTaskIncrementTick
 
-	.text
+	.section	.lowtext
 	.align 2
 
 /* FreeRTOS yield handler.  This is installed as the BRK software interrupt
 handler. */
 _vPortYield:
+	/* Mask the tick interrupt and interrupts which
+	 * call FreeRTOS API functions ending with FromISR. */
+	clr1	psw.1
+	/* Re-enable high priority interrupts but which
+	 * cannot call FreeRTOS API functions in ISR. */
+	ei
 	/* Save the context of the current task. */
 	portSAVE_CONTEXT
 	/* Call the scheduler to select the next task. */
@@ -49,7 +55,6 @@ _vPortYield:
 	/* Restore the context of the next task to run. */
 	portRESTORE_CONTEXT
 	retb
-
 
 /* Starts the scheduler by restoring the context of the task that will execute
 first. */
@@ -64,7 +69,9 @@ _vPortStartFirstTask:
 handler. */
 	.align 2
 _vPortTickISR:
-
+	/* Re-enable high priority interrupts but which
+	 * cannot call FreeRTOS API functions in ISR. */
+	ei
 	/* Save the context of the currently executing task. */
 	portSAVE_CONTEXT
 	/* Call the RTOS tick function. */
@@ -85,8 +92,6 @@ _vPortFreeRTOSInterruptCommonHandler_C:
 	/* Save the context of the currently executing task. */
 	portSAVE_CONTEXT_C
 	/* Call the target interrupt handler. */
-	clrb	a
-	mov		cs, a
 	call	bc
 	/* Retore the context of whichever task will run next. */
 	portRESTORE_CONTEXT
