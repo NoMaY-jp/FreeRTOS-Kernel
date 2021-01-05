@@ -27,6 +27,8 @@
 
 #include "ISR_Support.h"
 
+#define portPSW_ISP_SYSCALL_INTERRUPT_DISABLE (2 << 1)
+
 #define CS                    0xFFFFC
 #define ES                    0xFFFFD
 
@@ -64,10 +66,14 @@
     RSEG CODE:CODE
 _vPortYield:
 ___interrupt_0x7E:
-	clr1	psw.1			        ; Mask the tick interrupt and interrupts which
+	ei						        ; Re-enable high priority interrupts but which cannot
 							        ; call FreeRTOS API functions ending with FromISR.
-	ei						        ; Re-enable high priority interrupts but which
-							        ; cannot call FreeRTOS API functions in ISR.
+	push	ax
+	mov		a, psw			        ; Mask the tick interrupt and user interrupts which
+	and		a, #0xF9 /*0b11111001*/ ; call FreeRTOS API functions ending with FromISR
+	or		a, #portPSW_ISP_SYSCALL_INTERRUPT_DISABLE   ; while the kernel structures are being accessed and
+	mov		psw, a			        ; FreeRTOS interrupt dedicated stack is being used.
+	pop		ax
 	portSAVE_CONTEXT		        ; Save the context of the current task.
 	call      _vTaskSwitchContext   ; Call the scheduler to select the next task.
 	portRESTORE_CONTEXT		        ; Restore the context of the next task to run.

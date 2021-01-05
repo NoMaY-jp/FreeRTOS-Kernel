@@ -28,6 +28,8 @@
 #include "FreeRTOSConfig.h"
 #include "ISR_Support.h"
 
+	portPSW_ISP_SYSCALL_INTERRUPT_DISABLE = (2 << 1)
+
 	.global    _vPortYield
 	.global    _vPortStartFirstTask
 	.global    _vPortTickISR
@@ -36,18 +38,25 @@
 	.extern    _vTaskSwitchContext
 	.extern    _xTaskIncrementTick
 
-	.section	.lowtext
+	.section   .lowtext
 	.align 2
 
 /* FreeRTOS yield handler.  This is installed as the BRK software interrupt
 handler. */
 _vPortYield:
-	/* Mask the tick interrupt and interrupts which
+	/* Re-enable high priority interrupts but which cannot
 	 * call FreeRTOS API functions ending with FromISR. */
-	clr1	psw.1
-	/* Re-enable high priority interrupts but which
-	 * cannot call FreeRTOS API functions in ISR. */
 	ei
+	/* Mask the tick interrupt and user interrupts which
+	 * call FreeRTOS API functions ending with FromISR
+	 * while the kernel structures are being accessed and
+	 * FreeRTOS interrupt dedicated stack is being used. */
+	push	ax
+	mov		a, psw
+	and		a, #0b11111001
+	or		a, #portPSW_ISP_SYSCALL_INTERRUPT_DISABLE
+	mov		psw, a
+	pop		ax
 	/* Save the context of the current task. */
 	portSAVE_CONTEXT
 	/* Call the scheduler to select the next task. */

@@ -46,6 +46,16 @@ interrupts don't accidentally become enabled before the scheduler is started. */
  */
 #define portPSW		  ( 0xc6UL )
 
+/* PSW's ISP bits values related to SYSCALL interrupts. */
+#define portPSW_ISP_SYSCALL_INTERRUPT_ENABLE     ( 3 << 1 )
+#define portPSW_ISP_SYSCALL_INTERRUPT_DISABLE    ( 2 << 1 )
+#define portPSW_ISP_SYSCALL_INTERRUPT_EXECUTING  ( 2 << 1 )
+
+/* Macros to get/set PSW's ISP bits. (Operator '&' or '|' may change Zero Flag.) */
+#define portPSW_REG           ( * ( volatile uint8_t * ) 0xffffa )
+#define portGET_PSW_ISP()     ( portPSW_REG & 0x06 /* 0b00000110 */ )
+#define portSET_PSW_ISP(val)  ( portPSW_REG = ( portPSW_REG & 0xF9 /* 0b11111001 */ ) | ( val ) )
+
 /* Each task maintains a count of the critical section nesting depth.  Each time
 a critical section is entered the count is incremented.  Each time a critical
 section is exited the count is decremented - with interrupts only being
@@ -221,5 +231,60 @@ const uint16_t usCompareMatch = ( usClockHz / configTICK_RATE_HZ ) - 1UL;
 	#endif
 }
 #endif /* ifndef configSETUP_TICK_INTERRUPT */
+/*-----------------------------------------------------------*/
+
+void vPortENABLE_SYSCALL_INTERRUPT( void )
+{
+	portSET_PSW_ISP( portPSW_ISP_SYSCALL_INTERRUPT_ENABLE );
+}
+/*-----------------------------------------------------------*/
+
+void vPortDISABLE_SYSCALL_INTERRUPT( void )
+{
+#ifdef configASSERT
+	if( portGET_PSW_ISP() == portPSW_ISP_SYSCALL_INTERRUPT_ENABLE)
+	{
+		portSET_PSW_ISP( portPSW_ISP_SYSCALL_INTERRUPT_DISABLE );
+	}
+#else
+	portSET_PSW_ISP( portPSW_ISP_SYSCALL_INTERRUPT_DISABLE );
+#endif
+}
+/*-----------------------------------------------------------*/
+
+#ifdef configASSERT
+void vPortASSERT_IF_SYSCALL_INTERRUPT_PRIORITY_INVALID( void )
+{
+	configASSERT( portGET_PSW_ISP() == portPSW_ISP_SYSCALL_INTERRUPT_EXECUTING );
+}
+#endif
+/*-----------------------------------------------------------*/
+
+void vPortENTER_CRITICAL( void )
+{
+	vPortDISABLE_SYSCALL_INTERRUPT();
+
+	/* Now interrupts are disabled ulCriticalNesting can be accessed
+	 * directly.  Increment ulCriticalNesting to keep a count of how many
+	 * times portENTER_CRITICAL() has been called. */
+	usCriticalNesting++;
+}
+/*-----------------------------------------------------------*/
+
+void vPortEXIT_CRITICAL( void )
+{
+	if( usCriticalNesting > portNO_CRITICAL_SECTION_NESTING )
+	{
+		/* Decrement the nesting count as we are leaving a critical section. */
+		usCriticalNesting--;
+
+		/* If the nesting level has reached zero then interrupts should be
+		 * re-enabled. */
+		if( usCriticalNesting == portNO_CRITICAL_SECTION_NESTING )
+		{
+			vPortENABLE_SYSCALL_INTERRUPT();
+		}
+	}
+}
 /*-----------------------------------------------------------*/
 

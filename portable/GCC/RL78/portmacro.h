@@ -76,47 +76,26 @@ typedef unsigned short UBaseType_t;
  * interrupt API to ensure API function and interrupt entry is as fast and as
  * simple as possible. */
 
-/* Change { PSW.ISP1, PSW.ISP0 } = { PSW.2, PSW.1 } : { 1, 1 } --> { 1, 0 }. */
-#define portDISABLE_INTERRUPTS() __asm volatile ( "CLR1 PSW.1" )
-/* Change { PSW.ISP1, PSW.ISP0 } = { PSW.2, PSW.1 } : { 1, 0 } --> { 1, 1 }. */
-#define portENABLE_INTERRUPTS()  __asm volatile ( "SET1	PSW.1" )
+void vPortDISABLE_SYSCALL_INTERRUPT( void );
+#define portDISABLE_INTERRUPTS()  vPortDISABLE_SYSCALL_INTERRUPT()
+
+void vPortENABLE_SYSCALL_INTERRUPT( void );
+#define portENABLE_INTERRUPTS()   vPortENABLE_SYSCALL_INTERRUPT()
+
 #ifdef configASSERT
-	#define portASSERT_IF_INTERRUPT_PRIORITY_INVALID()	configASSERT( __builtin_rl78_getpswisp() == 2 )
+	void vPortASSERT_IF_SYSCALL_INTERRUPT_PRIORITY_INVALID( void );
+	#define portASSERT_IF_INTERRUPT_PRIORITY_INVALID()  vPortASSERT_IF_SYSCALL_INTERRUPT_PRIORITY_INVALID()
 #endif
 /*-----------------------------------------------------------*/
 
 /* Critical section control macros. */
 #define portNO_CRITICAL_SECTION_NESTING		( ( unsigned short ) 0 )
 
-#define portENTER_CRITICAL()													\
-{																				\
-extern volatile uint16_t usCriticalNesting;										\
-																				\
-	portDISABLE_INTERRUPTS();													\
-																				\
-	/* Now interrupts are disabled ulCriticalNesting can be accessed */			\
-	/* directly.  Increment ulCriticalNesting to keep a count of how many */	\
-	/* times portENTER_CRITICAL() has been called. */							\
-	usCriticalNesting++;														\
-}
+void vPortENTER_CRITICAL( void );
+#define portENTER_CRITICAL()  vPortENTER_CRITICAL()
 
-#define portEXIT_CRITICAL()														\
-{																				\
-extern volatile uint16_t usCriticalNesting;										\
-																				\
-	if( usCriticalNesting > portNO_CRITICAL_SECTION_NESTING )					\
-	{																			\
-		/* Decrement the nesting count as we are leaving a critical section. */	\
-		usCriticalNesting--;													\
-																				\
-		/* If the nesting level has reached zero then interrupts should be */	\
-		/* re-enabled. */														\
-		if( usCriticalNesting == portNO_CRITICAL_SECTION_NESTING )				\
-		{																		\
-			portENABLE_INTERRUPTS();											\
-		}																		\
-	}																			\
-}
+void vPortEXIT_CRITICAL( void );
+#define portEXIT_CRITICAL()   vPortEXIT_CRITICAL()
 /*-----------------------------------------------------------*/
 
 /* Task utilities. */

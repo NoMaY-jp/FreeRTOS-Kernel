@@ -78,72 +78,27 @@ typedef unsigned short UBaseType_t;
  * functions are those that end in FromISR.  FreeRTOS maintains a separate
  * interrupt API to ensure API function and interrupt entry is as fast and as
  * simple as possible. */
-#pragma inline_asm vPortDISABLE_INTERRUPTS
-static void vPortDISABLE_INTERRUPTS( void )
-{
-#ifndef __CDT_PARSER__
-	/* Change { PSW.ISP1, PSW.ISP0 } = { PSW.2, PSW.1 } : { 1, 1 } --> { 1, 0 }. */
-	CLR1	PSW.1
-#endif
-}
-#pragma inline_asm vPortENABLE_INTERRUPTS
-static void vPortENABLE_INTERRUPTS( void )
-{
-#ifndef __CDT_PARSER__
-	/* Change { PSW.ISP1, PSW.ISP0 } = { PSW.2, PSW.1 } : { 1, 0 } --> { 1, 1 }. */
-	SET1	PSW.1
-#endif
-}
-#pragma inline_asm vPortGET_ISP
-static uint8_t vPortGET_ISP( void )
-{
-#ifndef __CDT_PARSER__
-	/* Return { PSW.ISP1, PSW.ISP0 } = { PSW.2, PSW.1 }. */
-	MOV		A, PSW
-	SHR		A, 1
-	AND		A, #3
-#endif
-}
 
-#define portDISABLE_INTERRUPTS()						vPortDISABLE_INTERRUPTS()
-#define portENABLE_INTERRUPTS()							vPortENABLE_INTERRUPTS()
+void vPortDISABLE_SYSCALL_INTERRUPT( void );
+#define portDISABLE_INTERRUPTS()  vPortDISABLE_SYSCALL_INTERRUPT()
+
+void vPortENABLE_SYSCALL_INTERRUPT( void );
+#define portENABLE_INTERRUPTS()   vPortENABLE_SYSCALL_INTERRUPT()
+
 #ifdef configASSERT
-	#define portASSERT_IF_INTERRUPT_PRIORITY_INVALID()	configASSERT( vPortGET_ISP() == 2 )
+	void vPortASSERT_IF_SYSCALL_INTERRUPT_PRIORITY_INVALID( void );
+	#define portASSERT_IF_INTERRUPT_PRIORITY_INVALID()  vPortASSERT_IF_SYSCALL_INTERRUPT_PRIORITY_INVALID()
 #endif
 /*-----------------------------------------------------------*/
 
 /* Critical section control macros. */
 #define portNO_CRITICAL_SECTION_NESTING		( ( uint16_t ) 0 )
 
-#define portENTER_CRITICAL()													\
-{																				\
-extern volatile uint16_t usCriticalNesting;										\
-																				\
-	portDISABLE_INTERRUPTS();													\
-																				\
-	/* Now interrupts are disabled ulCriticalNesting can be accessed */			\
-	/* directly.  Increment ulCriticalNesting to keep a count of how many */	\
-	/* times portENTER_CRITICAL() has been called. */							\
-	usCriticalNesting++;														\
-}
+void vPortENTER_CRITICAL( void );
+#define portENTER_CRITICAL()  vPortENTER_CRITICAL()
 
-#define portEXIT_CRITICAL()														\
-{																				\
-extern volatile uint16_t usCriticalNesting;										\
-																				\
-	if( usCriticalNesting > portNO_CRITICAL_SECTION_NESTING )					\
-	{																			\
-		/* Decrement the nesting count as we are leaving a critical section. */	\
-		usCriticalNesting--;													\
-																				\
-		/* If the nesting level has reached zero then interrupts should be */	\
-		/* re-enabled. */														\
-		if( usCriticalNesting == portNO_CRITICAL_SECTION_NESTING )				\
-		{																		\
-			portENABLE_INTERRUPTS();											\
-		}																		\
-	}																			\
-}
+void vPortEXIT_CRITICAL( void );
+#define portEXIT_CRITICAL()   vPortEXIT_CRITICAL()
 /*-----------------------------------------------------------*/
 
 /* Task utilities. */
