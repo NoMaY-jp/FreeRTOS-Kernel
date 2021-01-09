@@ -34,6 +34,7 @@
 	.global    _vPortStartFirstTask
 	.global    _vPortTickISR
 	.global    _vPortFreeRTOSInterruptCommonHandler_C
+	.global    _vPortInterruptCommonHandler_C
 
 	.extern    _vTaskSwitchContext
 	.extern    _xTaskIncrementTick
@@ -104,6 +105,18 @@ _vPortFreeRTOSInterruptCommonHandler_C:
 	call	bc
 	/* Retore the context of whichever task will run next. */
 	portRESTORE_CONTEXT
+	reti
+
+/* Common interrupt handler. */
+	.align 2
+_vPortInterruptCommonHandler_C:
+	/* Argument: BC is the target interrupt handler address. */
+	/* Save the context of the currently executing task. */
+	portSAVE_REGISTERS_C
+	/* Call the target interrupt handler. */
+	call	bc
+	/* Retore the context of whichever task will run next. */
+	portRESTORE_REGISTERS
 	reti
 
 	.end

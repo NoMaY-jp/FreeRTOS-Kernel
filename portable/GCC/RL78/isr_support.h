@@ -54,6 +54,7 @@
 	.extern    _pxCurrentTCB
 	.extern    _usCriticalNesting
 	.extern    _stack
+	.extern    _end
 
 /*
  * portSAVE_CONTEXT MACRO
@@ -103,7 +104,7 @@
 	/* Switch stack pointers. Interrupts which call FreeRTOS API functions
 	 * ending with FromISR cannot be nested. On the other hand, high priority
 	 * interrupts which does not call FreeRTOS API functions can be nested. */
-	movw sp,#_stack /* Set stack pointer */
+	MOVW	SP, #_stack /* Set stack pointer */
 
 	.endm
 
@@ -111,7 +112,7 @@
 /*
  * portRESTORE_CONTEXT MACRO
  * Restores the task Stack Pointer then use this to restore usCriticalNesting,
- * general purpose registers and the CS and ES of the selected task
+ * general purpose registers and the CS and ES registers of the selected task
  * from the task stack
  */
 .macro portRESTORE_CONTEXT MACRO
@@ -154,7 +155,7 @@
 
 /*
  * portSAVE_CONTEXT_C MACRO
- * Saves the context of the general purpose registers, the ES register,
+ * Saves the context of the general purpose registers, CS and ES registers,
  * the usCriticalNesting Value and the Stack Pointer of the active Task
  * onto the task stack
  */
@@ -200,7 +201,84 @@
 	/* Switch stack pointers. Interrupts which call FreeRTOS API functions
 	 * ending with FromISR cannot be nested. On the other hand, high priority
 	 * interrupts which does not call FreeRTOS API functions can be nested. */
-	movw sp,#_stack /* Set stack pointer */
+	MOVW	SP, #_stack /* Set stack pointer */
+
+	.endm
+
+/*
+ * portSAVE_REGISTERS_C MACRO
+ * Saves the content of the general purpose registers, CS and ES registers.
+ */
+.macro portSAVE_REGISTERS_C MACRO
+
+	/* It is assumed that the following registers have been saved.
+	SEL		RB0
+	PUSH	AX
+	PUSH	BC
+	*/
+	/* Switch stack pointers. Interrupts which call FreeRTOS API functions
+	 * ending with FromISR cannot be nested. On the other hand, high priority
+	 * interrupts which does not call FreeRTOS API functions can be nested.
+	 * When SP <= _end or _stack < SP, do switching. */
+	MOVW	AX, SP
+	CMPW	AX, #_end
+	BNH		$1f
+	CMPW	AX, #_stack
+	SKNH
+1:
+	MOVW	SP, #_stack /* Set stack pointer */
+	/* Save the previous SP register. */
+	PUSH    AX
+	/* Save DE and HL registers of bank 0. */
+	PUSH	DE
+	PUSH	HL
+	/* Save CS register. */
+	MOV 	A, CS
+	MOV		X, A
+	/* Save ES register. */
+	MOV		A, ES
+	PUSH	AX
+	/* Save the register bank1 (r8 - r15) - only necessary in the GCC port. */
+	SEL		RB1
+	PUSH	AX
+	PUSH	BC
+	PUSH	DE
+	PUSH	HL
+	/* Registers in bank 3 are for ISR use only so don't need saving. */
+	SEL		RB0
+	/* Set CS register to 0 - only necessary in the GCC port. */
+	CLRB	A
+	MOV		CS, A
+
+	.endm
+
+/*
+ * portRESTORE_REGISTERS MACRO
+ * Restores the general purpose registers and the CS and ES registers.
+ */
+.macro portRESTORE_REGISTERS MACRO
+	/* Restore the register bank1 (r8 - r15) */
+	SEL		RB1
+	POP		HL
+	POP		DE
+	POP		BC
+	POP		AX
+	SEL		RB0
+	/* Restore the ES register. */
+	POP		AX
+	MOV		ES, A
+	/* Restore the CS register. */
+	MOV		A, X
+	MOV		CS, A
+	/* Restore the DE and HL registers of bank 0. */
+	POP		HL
+	POP		DE
+	/* Restore the previous SP register. */
+	POP		AX
+	MOVW	SP, AX
+	/* Restore the AX and BC registers of bank 0. */
+	POP		BC
+	POP		AX
 
 	.endm
 

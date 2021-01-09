@@ -33,6 +33,7 @@
 	EXTERN    _pxCurrentTCB
 	EXTERN    _usCriticalNesting
 	EXTERN    CSTACK$$Limit
+	EXTERN    CSTACK$$Base
 
 ;------------------------------------------------------------------------------
 ;   portSAVE_CONTEXT MACRO
@@ -124,5 +125,59 @@ portSAVE_CONTEXT_C MACRO
 ;	ending with FromISR cannot be nested. On the other hand, high priority
 ;	interrupts which does not call FreeRTOS API functions can be nested.
 	MOVW      SP, #LWRD(CSTACK$$Limit)     ; Set stack pointer
+	ENDM
+;------------------------------------------------------------------------------
+
+;------------------------------------------------------------------------------
+;   portSAVE_REGISTERS_C MACRO
+;   Saves the context of the general purpose registers, CS and ES registers.
+;------------------------------------------------------------------------------
+portSAVE_REGISTERS_C MACRO
+	LOCAL     switching_sp
+;	It is assumed that the general purpose registers, CS and ES registers
+;	have been saved as follows at the beginning of an interrupt function.
+;	PUSH      AX
+;	PUSH      BC
+;	PUSH      DE
+;	PUSH      HL
+;	; The following ICCRL78 compatible code doesn't work with Renesas RL78 simulator.
+;	; MOVW    AX, 0xFFFFC           ; Save the ES and CS register.
+;	; So the following code is used.
+;	MOV       A, CS                 ; Save CS register.
+;	MOV       X, A
+;	MOV       A, ES                 ; Save ES register.
+;	PUSH      AX
+;	Switch stack pointers. Interrupts which call FreeRTOS API functions
+;	ending with FromISR cannot be nested. On the other hand, high priority
+;	When SP <= CSTACK$$Base or CSTACK$$Limit < SP, do switching.
+	MOVW      AX, SP
+	CMPW      AX, #LWRD(CSTACK$$Base) 
+	BNH       $switching_sp
+	CMPW      AX, #LWRD(CSTACK$$Limit)
+	SKNH
+switching_sp:
+	MOVW      SP, #LWRD(CSTACK$$Limit)     ; Set stack pointer
+	PUSH      AX                    ; Save the previous SP register.
+	ENDM
+;------------------------------------------------------------------------------
+
+;------------------------------------------------------------------------------
+;   portRESTORE_REGISTERS MACRO
+;   Restores the general purpose registers and the CS and ES registers.
+;------------------------------------------------------------------------------
+portRESTORE_REGISTERS MACRO
+	POP       AX                    ; Restore the previous SP register.
+	MOVW      SP, AX
+	POP       AX
+	; The following ICCRL78 compatible code doesn't work with Renesas RL78 simulator.
+	; MOVW    0xFFFFC, AX           ; Restore the ES and CS register.
+	; So the following code is used.
+	MOV       ES, A                 ; Restore the ES register.
+	MOV       A, X
+	MOV       CS, A                 ; Restore the CS register.
+	POP       HL                    ; Restore general purpose registers.
+	POP       DE
+	POP       BC
+	POP       AX
 	ENDM
 ;------------------------------------------------------------------------------

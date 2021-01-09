@@ -36,6 +36,7 @@ $include "ISR_Support.h"
 	.PUBLIC    _vPortStartFirstTask
 	.PUBLIC    _vPortTickISR
 	.PUBLIC    _vPortFreeRTOSInterruptCommonHandler_C
+	.PUBLIC    _vPortInterruptCommonHandler_C
 
 	.EXTERN    _vTaskSwitchContext
 	.EXTERN    _xTaskIncrementTick
@@ -94,52 +95,22 @@ _vPortFreeRTOSInterruptCommonHandler_C:
 	reti
 
 
+; Common interrupt handler.
+	.SECTION .text,TEXT
+_vPortInterruptCommonHandler_C:
+	; Argument: BC is the target interrupt handler address.
+	portSAVE_REGISTERS_C	       ; Save the content of the registers.
+	; Call the target interrupt handler.
+	clrb	a
+	mov		cs, a
+	call	bc					   ; Call the target interrupt handler.
+	portRESTORE_REGISTERS	       ; Restore the content of the registers.
+	reti
+
+
 ; Install the interrupt handlers
 
 	_vPortTickISR    .VECTOR    configTICK_VECTOR
 
 	_vPortYield      .VECTOR    0x7E
 
-
-; Somehow CS+ debugger needs more lines at least this file >= ISR_Support.h.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-; Here.

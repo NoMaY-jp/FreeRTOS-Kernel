@@ -54,6 +54,7 @@
 	PUBLIC    _vPortStartFirstTask
 	PUBLIC    _vPortTickISR
 	PUBLIC    _vPortFreeRTOSInterruptCommonHandler_C
+	PUBLIC    _vPortInterruptCommonHandler_C
 
 	PUBLIC	  ___interrupt_0x7E
 	PUBLIC	  ___interrupt_TICK_VECTOR
@@ -114,6 +115,19 @@ _vPortFreeRTOSInterruptCommonHandler_C:
 	mov		cs, a
 	call	bc					   ; Call the target interrupt handler.
 	portRESTORE_CONTEXT		       ; Restore the context of the next task to run.
+	reti
+
+
+; Common interrupt handler.
+	 RSEG CODE:CODE
+_vPortInterruptCommonHandler_C:
+	; Argument: BC is the target interrupt handler address.
+	portSAVE_REGISTERS_C	       ; Save the context of the current task.
+	; Call the target interrupt handler.
+	clrb	a
+	mov		cs, a
+	call	bc					   ; Call the target interrupt handler.
+	portRESTORE_REGISTERS	       ; Restore the context of the next task to run.
 	reti
 
 

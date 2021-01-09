@@ -35,6 +35,7 @@
 	.EXTERN    _pxCurrentTCB
 	.EXTERN    _usCriticalNesting
 	.EXTERN    __STACK_ADDR_START
+	.EXTERN    __STACK_ADDR_END
 
 ;------------------------------------------------------------------------------
 ;   portSAVE_CONTEXT MACRO
@@ -116,6 +117,55 @@ portSAVE_CONTEXT_C .MACRO
 ;	ending with FromISR cannot be nested. On the other hand, high priority
 ;	interrupts which does not call FreeRTOS API functions can be nested.
 	MOVW      SP, #LOWW(__STACK_ADDR_START)     ; Set stack pointer
+	.ENDM
+;------------------------------------------------------------------------------
+
+;------------------------------------------------------------------------------
+;   portSAVE_REGISTERS_C MACRO
+;   Saves the content of the general purpose registers, CS and ES registers.
+;------------------------------------------------------------------------------
+portSAVE_REGISTERS_C .MACRO
+	.local    switching_sp
+;   It is assumed that the general purpose registers, CS and ES registers
+;   have been saved as follows at the beginning of an interrupt function.
+;	PUSH      AX
+;	PUSH      BC
+;	PUSH      DE
+;	PUSH      HL
+;	MOV       A, ES
+;	MOV       X, A
+;	MOV       A, CS
+;	PUSH      AX
+;	Switch stack pointers. Interrupts which call FreeRTOS API functions
+;	ending with FromISR cannot be nested. On the other hand, high priority
+;	interrupts which does not call FreeRTOS API functions can be nested.
+;	When SP <= __STACK_ADDR_END or __STACK_ADDR_START < SP, do switching.
+	MOVW      AX, SP
+	CMPW      AX, #LOWW(__STACK_ADDR_END)
+	BNH       $switching_sp
+	CMPW      AX, #LOWW(__STACK_ADDR_START)
+	SKNH
+switching_sp:
+	MOVW      SP, #LOWW(__STACK_ADDR_START)     ; Set stack pointer
+	PUSH      AX                    ; Save the previous SP register.
+	.ENDM
+;------------------------------------------------------------------------------
+
+;------------------------------------------------------------------------------
+;   portRESTORE_REGISTERS MACRO
+	;   Restores the general purpose registers and the CS and ES registers.
+;------------------------------------------------------------------------------
+portRESTORE_REGISTERS .MACRO
+	POP       AX                    ; Restore the previous SP register.
+	MOVW      SP, AX
+	POP       AX                    ; Restore the CS register.
+	MOV       CS, A
+	MOV       A, X                  ; Restore the ES register.
+	MOV       ES, A
+	POP       HL                    ; Restore general purpose registers.
+	POP       DE
+	POP       BC
+	POP       AX
 	.ENDM
 ;------------------------------------------------------------------------------
 
