@@ -52,7 +52,7 @@ interrupts don't accidentally become enabled before the scheduler is started. */
 #define portPSW_ISP_SYSCALL_INTERRUPT_EXECUTING  ( 2 << 1 )
 
 /* Macros to get/set PSW's ISP bits. (Operator '&' or '|' may change Zero Flag.) */
-#define portPSW_REG           ( * ( volatile uint8_t * ) 0xffffa )
+#define portPSW_REG           ( * ( /* volatile is unnecessary in the use case here */ uint8_t * ) 0xffffa )
 #define portGET_PSW_ISP()     ( portPSW_REG & 0x06 /* 0b00000110 */ )
 #define portSET_PSW_ISP(val)  ( portPSW_REG = ( portPSW_REG & 0xF9 /* 0b11111001 */ ) | ( val ) )
 
@@ -233,22 +233,40 @@ const uint16_t usCompareMatch = ( usClockHz / configTICK_RATE_HZ ) - 1UL;
 #endif /* ifndef configSETUP_TICK_INTERRUPT */
 /*-----------------------------------------------------------*/
 
+#define portENABLE_SYSCALL_INTERRUPT() \
+	do \
+	{ \
+		portSET_PSW_ISP( portPSW_ISP_SYSCALL_INTERRUPT_ENABLE ); \
+	} while(0)
+/*-----------------------------------------------------------*/
+
+#if( configASSERT_DEFINED == 1 )
+#define portDISABLE_SYSCALL_INTERRUPT() \
+	do \
+	{ \
+		if( portGET_PSW_ISP() == portPSW_ISP_SYSCALL_INTERRUPT_ENABLE) \
+		{ \
+			portSET_PSW_ISP( portPSW_ISP_SYSCALL_INTERRUPT_DISABLE ); \
+		} \
+	} while(0)
+#else
+#define portDISABLE_SYSCALL_INTERRUPT() \
+	do \
+	{ \
+		portSET_PSW_ISP( portPSW_ISP_SYSCALL_INTERRUPT_DISABLE ); \
+	} while(0)
+#endif
+/*-----------------------------------------------------------*/
+
 void vPortENABLE_SYSCALL_INTERRUPT( void )
 {
-	portSET_PSW_ISP( portPSW_ISP_SYSCALL_INTERRUPT_ENABLE );
+	portENABLE_SYSCALL_INTERRUPT();
 }
 /*-----------------------------------------------------------*/
 
 void vPortDISABLE_SYSCALL_INTERRUPT( void )
 {
-#ifdef configASSERT
-	if( portGET_PSW_ISP() == portPSW_ISP_SYSCALL_INTERRUPT_ENABLE)
-	{
-		portSET_PSW_ISP( portPSW_ISP_SYSCALL_INTERRUPT_DISABLE );
-	}
-#else
-	portSET_PSW_ISP( portPSW_ISP_SYSCALL_INTERRUPT_DISABLE );
-#endif
+	portDISABLE_SYSCALL_INTERRUPT();
 }
 /*-----------------------------------------------------------*/
 
@@ -262,7 +280,7 @@ void vPortASSERT_IF_SYSCALL_INTERRUPT_PRIORITY_INVALID( void )
 
 void vPortENTER_CRITICAL( void )
 {
-	vPortDISABLE_SYSCALL_INTERRUPT();
+	portDISABLE_SYSCALL_INTERRUPT();
 
 	/* Now interrupts are disabled ulCriticalNesting can be accessed
 	 * directly.  Increment ulCriticalNesting to keep a count of how many
@@ -282,7 +300,7 @@ void vPortEXIT_CRITICAL( void )
 		 * re-enabled. */
 		if( usCriticalNesting == portNO_CRITICAL_SECTION_NESTING )
 		{
-			vPortENABLE_SYSCALL_INTERRUPT();
+			portENABLE_SYSCALL_INTERRUPT();
 		}
 	}
 }
