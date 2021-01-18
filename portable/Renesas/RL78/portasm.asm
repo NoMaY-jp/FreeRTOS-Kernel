@@ -42,18 +42,34 @@ $include "ISR_Support.h"
 	.EXTERN    _xTaskIncrementTick
 
 ; FreeRTOS yield handler.  This is installed as the BRK software interrupt
-; handler.
+; handler.  This BRK handler is called not only outside a critical section
+; but also inside a critical section.  The ISP bits value of PSW depends on
+; each case but the value is saved by BRK instruction as a part of PSW and
+; restored by RETB instruction as a part of PSW.
 	.SECTION .text,TEXT
 _vPortYield:
-	ei						        ; Re-enable high priority interrupts but which cannot
-							        ; call FreeRTOS API functions ending with FromISR.
-	push	ax
-	mov		a, psw			        ; Mask the tick interrupt and user interrupts which
-	and		a, #0b11111001          ; call FreeRTOS API functions ending with FromISR
-	or		a, #portPSW_ISP_SYSCALL_INTERRUPT_DISABLE   ; while the kernel structures are being accessed and
-	mov		psw, a			        ; FreeRTOS interrupt dedicated stack is being used.
-	pop		ax
+	.STACK _vPortYield = 16
+;	The following code can be optimized using set1 and clr1 instructions as follows.
+;	push	ax				        ; Mask the tick interrupt (kernel interrupt)
+;	mov		a, psw			        ; and user interrupts which call FreeRTOS
+;	and		a, #0b11111001          ; API functions ending with FromISR (i.e.
+;	or		a, #portPSW_ISP_SYSCALL_INTERRUPT_DISABLE ; SYSCALL interrupts) while
+;	mov		psw, a			        ; the kernel structures are being accessed
+;	pop		ax				        ; and interrupt dedicated stack is being used.
+$if (portPSW_ISP_SYSCALL_INTERRUPT_DISABLE & 0b00000010) == 0
+	clr1	psw.1
+$else
+	set1	psw.1
+$endif
+$if (portPSW_ISP_SYSCALL_INTERRUPT_DISABLE & 0b00000100) == 0
+	clr1	psw.2
+$else
+	set1	psw.2
+$endif
 	portSAVE_CONTEXT		        ; Save the context of the current task.
+							        ; Additionally re-enable high priority interrupts
+							        ; but any FreeRTOS API functions cannot be called
+							        ; in its ISRs.
 	call@      _vTaskSwitchContext  ; Call the scheduler to select the next task.
 	portRESTORE_CONTEXT		        ; Restore the context of the next task to run.
 	retb
@@ -63,6 +79,7 @@ _vPortYield:
 ; first.
 	.SECTION .text,TEXT
 _vPortStartFirstTask:
+	.STACK _vPortStartFirstTask = 4
 	portRESTORE_CONTEXT	            ; Restore the context of whichever task the ...
 	reti					        ; An interrupt stack frame is used so the task
                                     ; is started using a RETI instruction.
@@ -71,25 +88,28 @@ _vPortStartFirstTask:
 ; handler.
 	.SECTION .text,TEXT
 _vPortTickISR:
-	ei						       ; Re-enable high priority interrupts but which
-							       ; cannot call FreeRTOS API functions in ISR.
-	portSAVE_CONTEXT		       ; Save the context of the current task.
-	call@	_xTaskIncrementTick    ; Call the timer tick function.
-	cmpw	ax, #0x00
-	skz
-	call@	_vTaskSwitchContext    ; Call the scheduler to select the next task.
-	portRESTORE_CONTEXT		       ; Restore the context of the next task to run.
+	.STACK _vPortTickISR = 16
+	portSAVE_CONTEXT		        ; Save the context of the current task.
+							        ; Additionally re-enable high priority interrupts
+							        ; but any FreeRTOS API functions cannot be called
+							        ; in its ISRs.
+	call@	_xTaskIncrementTick     ; Call the timer tick function.
+	or		a, x			        ; Check the return value is zero or not.
+	skz						        ; Skip the scheduler call if the value is zero.
+	call@	_vTaskSwitchContext     ; Call the scheduler to select the next task.
+	portRESTORE_CONTEXT		        ; Restore the context of the next task to run.
 	reti
 
 
 ; Common interrupt handler.
 	.SECTION .text,TEXT
 _vPortFreeRTOSInterruptCommonHandler_C:
+	.STACK _vPortFreeRTOSInterruptCommonHandler_C = 2
 	; Argument: BC is the target interrupt handler address.
+	;           DE is the stack pointer value before switching stack.
 	portSAVE_CONTEXT_C		       ; Save the context of the current task.
 	; Call the target interrupt handler.
-	clrb	a
-	mov		cs, a
+	mov		cs, #0
 	call	bc					   ; Call the target interrupt handler.
 	portRESTORE_CONTEXT		       ; Restore the context of the next task to run.
 	reti
@@ -98,11 +118,13 @@ _vPortFreeRTOSInterruptCommonHandler_C:
 ; Common interrupt handler.
 	.SECTION .text,TEXT
 _vPortInterruptCommonHandler_C:
+	.STACK _vPortFreeRTOSInterruptCommonHandler_C = 0
 	; Argument: BC is the target interrupt handler address.
+	;           DE is the stack pointer value before switching stack, or not used. It
+	;           depends on the ucInterruptStackNesting value.
 	portSAVE_REGISTERS_C	       ; Save the content of the registers.
 	; Call the target interrupt handler.
-	clrb	a
-	mov		cs, a
+	mov		cs, #0
 	call	bc					   ; Call the target interrupt handler.
 	portRESTORE_REGISTERS	       ; Restore the content of the registers.
 	reti

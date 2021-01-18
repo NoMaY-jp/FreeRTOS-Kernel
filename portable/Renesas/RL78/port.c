@@ -71,6 +71,19 @@ not be initialised to zero as that could cause problems during the startup
 sequence. */
 volatile uint16_t usCriticalNesting = portINITIAL_CRITICAL_NESTING;
 
+/* Each ISR which uses interrupt dedicated stack maintains a count of the interrupt
+nesting depth.  Each time an ISR is entered the count is incremented.  Each time
+an ISR is exited the count is decremented.  The stack is switched to interrupt stack
+from task stacks when the count changes from zero to one.  The stack is switched
+back to task stacks from interrupt stack when the count changes from one to zero.
+The count is held in the ucInterruptStackNesting variable.  The stack pointer value
+of interrupted task stack is held in the pxInterruptedTaskStack variable.  The value
+is saved to the variable when the stack is switched to interrupt stack from task
+stacks and restored from the variable when the stack is switched back to task stacks
+from interrupt stack. */
+volatile uint8_t ucInterruptStackNesting = 0;
+volatile StackType_t * pxInterruptedTaskStack = NULL;
+
 /*-----------------------------------------------------------*/
 
 /*

@@ -34,8 +34,9 @@
 ;------------------------------------------------------------------------------
 	.EXTERN    _pxCurrentTCB
 	.EXTERN    _usCriticalNesting
+	.EXTERN    _ucInterruptStackNesting
+	.EXTERN    _pxInterruptedTaskStack
 	.EXTERN    __STACK_ADDR_START
-	.EXTERN    __STACK_ADDR_END
 
 ;------------------------------------------------------------------------------
 ;   portSAVE_CONTEXT MACRO
@@ -54,14 +55,21 @@ portSAVE_CONTEXT .MACRO
 	PUSH      AX
 	MOVW      AX, !_usCriticalNesting   ; Save the usCriticalNesting value.
 	PUSH      AX
-	MOVW      AX, !_pxCurrentTCB    ; Save the Stack pointer.
-	MOVW      HL, AX
+;	Switch stack pointers.  Interrupts which call FreeRTOS API functions
+;	ending with FromISR cannot be nested.  On the other hand, high priority
+;	interrupts which don't call any FreeRTOS API functions can be nested.
+	ONEB      !_ucInterruptStackNesting     ; Change the value: 0 --> 1.
 	MOVW      AX, SP
-	MOVW      [HL], AX
-;	Switch stack pointers. Interrupts which call FreeRTOS API functions
-;	ending with FromISR cannot be nested. On the other hand, high priority
-;	interrupts which does not call FreeRTOS API functions can be nested.
 	MOVW      SP, #LOWW(__STACK_ADDR_START)     ; Set stack pointer
+;	Don't enable nested interrupts from the beginning of interrupt until
+;	the completion of switching the stack from task stacks to interrupt
+;	stack.  If it is enabled before switching the stack to interrupt
+;	stack, each task stack need additional space for nested interrupt.
+;	Moreover ucInterruptStackNesting has to be modified in the same DI
+;	period so that the next switching of the stack is perfomed correctly.
+	EI
+	MOVW      HL, !_pxCurrentTCB    ; Save the task Stack Pointer.
+	MOVW      [HL], AX
 	.ENDM
 ;------------------------------------------------------------------------------
 
@@ -72,16 +80,23 @@ portSAVE_CONTEXT .MACRO
 ;   from the task stack
 ;------------------------------------------------------------------------------
 portRESTORE_CONTEXT .MACRO
-	MOVW      AX, !_pxCurrentTCB    ; Restore the Stack pointer.
-	MOVW      HL, AX
+	MOVW      HL, !_pxCurrentTCB    ; Restore the task Stack Pointer.
 	MOVW      AX, [HL]
+;	Don't enable nested interrupts from the completion of switching the
+;	stack from interrupt stack to task stacks until the RETI or RETB
+;	instruction is　executed.  If it is enabled after switching the stack,
+;	each　task stack needs additional space for nested interrupts.
+;	Moreover ucInterruptStackNesting has to be modified in the same DI
+;	period so that the next switching of the stack is perfomed correctly.
+	DI
 	MOVW      SP, AX
-	POP       AX                    ; Restore usCriticalNesting value.
-	MOVW      !_usCriticalNesting, AX
-	POP       AX                    ; Restore the CS register.
-	MOV       CS, A
-	MOV       A, X                  ; Restore the ES register.
-	MOV       ES, A
+	CLRB      !_ucInterruptStackNesting     ; Change the value: 1 --> 0.
+	POP       AX
+	MOVW      !_usCriticalNesting, AX   ; Restore usCriticalNesting value.
+	POP       AX
+	MOV       CS, A                 ; Restore the CS register.
+	MOV       A, X
+	MOV       ES, A                 ; Restore the ES register.
 	POP       HL                    ; Restore general purpose registers.
 	POP       DE
 	POP       BC
@@ -97,7 +112,8 @@ portRESTORE_CONTEXT .MACRO
 ;------------------------------------------------------------------------------
 portSAVE_CONTEXT_C .MACRO
 ;   It is assumed that the general purpose registers, CS and ES registers
-;   have been saved as follows at the beginning of an interrupt function.
+;   have been saved and the stack pointer has been switched as follows at
+;   the beginning of an interrupt function.
 ;	PUSH      AX
 ;	PUSH      BC
 ;	PUSH      DE
@@ -106,17 +122,26 @@ portSAVE_CONTEXT_C .MACRO
 ;	MOV       X, A
 ;	MOV       A, CS
 ;	PUSH      AX 
-;   Saves the usCriticalNesting Value and the Stack Pointer.
+;	Switch stack pointers.  Interrupts which call FreeRTOS API functions
+;	ending with FromISR cannot be nested.  On the other hand, high priority
+;	interrupts which don't call any FreeRTOS API functions can be nested.
+;	ONEB      !_ucInterruptStackNesting
+;	MOVW      DE, SP
+;	MOVW      SP, #LOWW(__STACK_ADDR_START)
+;	Don't enable nested interrupts from the beginning of interrupt until
+;	the completion of switching the stack from task stacks to interrupt
+;	stack.  If it is enabled before switching the stack to interrupt
+;	stack, each task stack need additional space for nested interrupt.
+;	Moreover ucInterruptStackNesting has to be modified in the same DI
+;	period so that the next switching of the stack is perfomed correctly.
+;	EI or without EI
+	DECW      DE
+	DECW      DE
 	MOVW      AX, !_usCriticalNesting   ; Save the usCriticalNesting value.
-	PUSH      AX
-	MOVW      AX, !_pxCurrentTCB    ; Save the Stack pointer.
-	MOVW      HL, AX
-	MOVW      AX, SP
+	MOVW      [DE], AX
+	MOVW      HL, !_pxCurrentTCB    ; Save the task Stack Pointer.
+	MOVW      AX, DE
 	MOVW      [HL], AX
-;	Switch stack pointers. Interrupts which call FreeRTOS API functions
-;	ending with FromISR cannot be nested. On the other hand, high priority
-;	interrupts which does not call FreeRTOS API functions can be nested.
-	MOVW      SP, #LOWW(__STACK_ADDR_START)     ; Set stack pointer
 	.ENDM
 ;------------------------------------------------------------------------------
 
@@ -125,9 +150,10 @@ portSAVE_CONTEXT_C .MACRO
 ;   Saves the content of the general purpose registers, CS and ES registers.
 ;------------------------------------------------------------------------------
 portSAVE_REGISTERS_C .MACRO
-	.local    switching_sp
+;	.local    .skip_switching_sp
 ;   It is assumed that the general purpose registers, CS and ES registers
-;   have been saved as follows at the beginning of an interrupt function.
+;   have been saved and the stack pointer has been switched as follows at
+;   the beginning of an interrupt function.
 ;	PUSH      AX
 ;	PUSH      BC
 ;	PUSH      DE
@@ -136,32 +162,55 @@ portSAVE_REGISTERS_C .MACRO
 ;	MOV       X, A
 ;	MOV       A, CS
 ;	PUSH      AX
-;	Switch stack pointers. Interrupts which call FreeRTOS API functions
-;	ending with FromISR cannot be nested. On the other hand, high priority
-;	interrupts which does not call FreeRTOS API functions can be nested.
-;	When SP <= __STACK_ADDR_END or __STACK_ADDR_START < SP, do switching.
-	MOVW      AX, SP
-	CMPW      AX, #LOWW(__STACK_ADDR_END)
-	BNH       $switching_sp
-	CMPW      AX, #LOWW(__STACK_ADDR_START)
-	SKNH
-switching_sp:
-	MOVW      SP, #LOWW(__STACK_ADDR_START)     ; Set stack pointer
-	PUSH      AX                    ; Save the previous SP register.
+;	Switch stack pointers.  Interrupts which call FreeRTOS API functions
+;	ending with FromISR cannot be nested.  On the other hand, high priority
+;	interrupts which don't call any FreeRTOS API functions can be nested.
+;	CMP0      !_ucInterruptStackNesting
+;	BNZ       $.skip_switching_sp
+;	MOVW      DE, SP
+;	MOVW      SP, #LOWW(__STACK_ADDR_START)
+;.skip_switching_sp:
+;	INC       !_ucInterruptStackNesting
+;	Don't enable nested interrupts from the beginning of interrupt until
+;	the completion of switching the stack from task stacks to interrupt
+;	stack.  If it is enabled before switching the stack to interrupt
+;	stack, each task stack need additional space for nested interrupt.
+;	Moreover ucInterruptStackNesting has to be modified in the same DI
+;	period so that the next switching of the stack is perfomed correctly.
+;	(On the other hand, referring ucInterruptStackNesting as follows
+;	works with no problem.)
+;	EI or without EI
+	.local    .skip_saving_sp
+	CMP       !_ucInterruptStackNesting, #1
+	BNZ       $.skip_saving_sp
+	MOVW      AX, DE
+	MOVW      !_pxInterruptedTaskStack, AX  ; Save the Stack Pointer.
+.skip_saving_sp:
 	.ENDM
 ;------------------------------------------------------------------------------
 
 ;------------------------------------------------------------------------------
 ;   portRESTORE_REGISTERS MACRO
-	;   Restores the general purpose registers and the CS and ES registers.
+;   Restores the general purpose registers and the CS and ES registers.
 ;------------------------------------------------------------------------------
 portRESTORE_REGISTERS .MACRO
-	POP       AX                    ; Restore the previous SP register.
+	.local    .skip_switching_sp
+;	Don't enable nested interrupts from the completion of switching the
+;	stack from interrupt stack to task stacks until the RETI or RETB
+;	instruction is　executed.  If it is enabled after switching the stack,
+;	each　task stack needs additional space for nested interrupts.
+;	Moreover ucInterruptStackNesting has to be modified in the same DI
+;	period so that the next switching of the stack is perfomed correctly.
+	DI
+	DEC       !_ucInterruptStackNesting
+	BNZ       $.skip_switching_sp
+	MOVW      AX, !_pxInterruptedTaskStack  ; Restore the Stack Pointer.
 	MOVW      SP, AX
-	POP       AX                    ; Restore the CS register.
-	MOV       CS, A
-	MOV       A, X                  ; Restore the ES register.
-	MOV       ES, A
+.skip_switching_sp:
+	POP       AX
+	MOV       CS, A                 ; Restore the CS register.
+	MOV       A, X
+	MOV       ES, A                 ; Restore the ES register.
 	POP       HL                    ; Restore general purpose registers.
 	POP       DE
 	POP       BC
