@@ -32,8 +32,9 @@
 ;------------------------------------------------------------------------------
 	EXTERN    _pxCurrentTCB
 	EXTERN    _usCriticalNesting
+	EXTERN    _ucInterruptStackNesting
+	EXTERN    _pxInterruptedTaskStack
 	EXTERN    CSTACK$$Limit
-	EXTERN    CSTACK$$Base
 
 ;------------------------------------------------------------------------------
 ;   portSAVE_CONTEXT MACRO
@@ -49,20 +50,30 @@ portSAVE_CONTEXT MACRO
 	; The following ICCRL78 compatible code doesn't work with Renesas RL78 simulator.
 	; MOVW    AX, 0xFFFFC           ; Save the ES and CS register.
 	; So the following code is used.
-	MOV       A, CS                 ; Save CS register.
+	MOV       A, CS                 ; Save the CS register.
 	MOV       X, A
-	MOV       A, ES                 ; Save ES register.
+	MOV       A, ES                 ; Save the ES register.
 	PUSH      AX
+;	Switch stack pointers.  Interrupts which call FreeRTOS API functions
+;	ending with FromISR cannot be nested.  On the other hand, high priority
+;	interrupts which don't call any FreeRTOS API functions can be nested.
+	MOVW      DE, SP
+	MOVW      SP, #LWRD(CSTACK$$Limit)      ; Set stack pointer
+	ONEB      _ucInterruptStackNesting      ; Change the value: 0 --> 1.
+;	Don't enable nested interrupts from the beginning of interrupt until
+;	the completion of switching the stack from task stacks to interrupt
+;	stack.  If it is enabled before switching the stack to interrupt
+;	stack, each task stack need additional space for nested interrupt.
+;	Moreover ucInterruptStackNesting has to be modified in the same DI
+;	period so that the next switching of the stack is perfomed correctly.
+	EI
+	DECW      DE
+	DECW      DE
 	MOVW      AX, _usCriticalNesting; Save the usCriticalNesting value.
-	PUSH      AX
-	MOVW      AX, _pxCurrentTCB 	; Save the Stack pointer.
-	MOVW      HL, AX
-	MOVW      AX, SP
+	MOVW      [DE], AX
+	MOVW      HL, _pxCurrentTCB     ; Save the task Stack Pointer.
+	MOVW      AX, DE
 	MOVW      [HL], AX
-;	Switch stack pointers. Interrupts which call FreeRTOS API functions
-;	ending with FromISR cannot be nested. On the other hand, high priority
-;	interrupts which does not call FreeRTOS API functions can be nested.
-	MOVW      SP, #LWRD(CSTACK$$Limit)     ; Set stack pointer
 	ENDM
 ;------------------------------------------------------------------------------
 
@@ -73,12 +84,19 @@ portSAVE_CONTEXT MACRO
 ;   from the task stack
 ;------------------------------------------------------------------------------
 portRESTORE_CONTEXT MACRO
-	MOVW      AX, _pxCurrentTCB	    ; Restore the Stack pointer.
-	MOVW      HL, AX
+	MOVW      HL, _pxCurrentTCB	    ; Restore the task Stack Pointer.
 	MOVW      AX, [HL]
+;	Don't enable nested interrupts from the completion of switching the
+;	stack from interrupt stack to task stacks until the RETI or RETB
+;	instruction is executed.  If it is enabled after switching the stack,
+;	each task stack needs additional space for nested interrupts.
+;	Moreover ucInterruptStackNesting has to be modified in the same DI
+;	period so that the next switching of the stack is perfomed correctly.
+	DI
 	MOVW      SP, AX
-	POP	      AX	                ; Restore usCriticalNesting value.
-	MOVW      _usCriticalNesting, AX
+	CLRB      _ucInterruptStackNesting  ; Change the value: 1 --> 0.
+	POP       AX
+	MOVW      _usCriticalNesting, AX    ; Restore usCriticalNesting value.
 	POP       AX
 	; The following ICCRL78 compatible code doesn't work with Renesas RL78 simulator.
 	; MOVW    0xFFFFC, AX           ; Restore the ES and CS register.
@@ -101,7 +119,8 @@ portRESTORE_CONTEXT MACRO
 ;------------------------------------------------------------------------------
 portSAVE_CONTEXT_C MACRO
 ;	It is assumed that the general purpose registers, CS and ES registers
-;	have been saved as follows at the beginning of an interrupt function.
+;	have been saved and the stack pointer has been switched as follows at
+;	the beginning of an interrupt function.
 ;	PUSH      AX
 ;	PUSH      BC
 ;	PUSH      DE
@@ -109,33 +128,41 @@ portSAVE_CONTEXT_C MACRO
 ;	; The following ICCRL78 compatible code doesn't work with Renesas RL78 simulator.
 ;	; MOVW    AX, 0xFFFFC           ; Save the ES and CS register.
 ;	; So the following code is used.
-;	MOV       A, CS                 ; Save CS register.
+;	MOV       A, CS
 ;	MOV       X, A
-;	MOV       A, ES                 ; Save ES register.
+;	MOV       A, ES
 ;	PUSH      AX
-;	Saves the context of the general purpose registers, CS and ES registers,
-;	the usCriticalNesting Value and the Stack Pointer of the active Task
+;	Switch stack pointers.  Interrupts which call FreeRTOS API functions
+;	ending with FromISR cannot be nested.  On the other hand, high priority
+;	interrupts which don't call any FreeRTOS API functions can be nested.
+;	MOVW      DE, SP
+;	MOVW      SP, #LWRD(CSTACK$$Limit)
+;	ONEB      !_ucInterruptStackNesting
+;	Don't enable nested interrupts from the beginning of interrupt until
+;	the completion of switching the stack from task stacks to interrupt
+;	stack.  If it is enabled before switching the stack to interrupt
+;	stack, each task stack need additional space for nested interrupt.
+;	Moreover ucInterruptStackNesting has to be modified in the same DI
+;	period so that the next switching of the stack is perfomed correctly.
+;	EI or without EI
+	DECW      DE
+	DECW      DE
 	MOVW      AX, _usCriticalNesting; Save the usCriticalNesting value.
-	PUSH      AX
-	MOVW      AX, _pxCurrentTCB     ; Save the Stack pointer.
-	MOVW      HL, AX
-	MOVW      AX, SP
+	MOVW      [DE], AX
+	MOVW      HL, _pxCurrentTCB     ; Save the task Stack Pointer.
+	MOVW      AX, DE
 	MOVW      [HL], AX
-;	Switch stack pointers. Interrupts which call FreeRTOS API functions
-;	ending with FromISR cannot be nested. On the other hand, high priority
-;	interrupts which does not call FreeRTOS API functions can be nested.
-	MOVW      SP, #LWRD(CSTACK$$Limit)     ; Set stack pointer
 	ENDM
 ;------------------------------------------------------------------------------
 
 ;------------------------------------------------------------------------------
 ;   portSAVE_REGISTERS_C MACRO
-;   Saves the context of the general purpose registers, CS and ES registers.
+;   Saves the content of the general purpose registers, CS and ES registers.
 ;------------------------------------------------------------------------------
 portSAVE_REGISTERS_C MACRO
-	LOCAL     switching_sp
 ;	It is assumed that the general purpose registers, CS and ES registers
-;	have been saved as follows at the beginning of an interrupt function.
+;	have been saved and the stack pointer has been switched as follows at
+;	the beginning of an interrupt function.
 ;	PUSH      AX
 ;	PUSH      BC
 ;	PUSH      DE
@@ -143,21 +170,31 @@ portSAVE_REGISTERS_C MACRO
 ;	; The following ICCRL78 compatible code doesn't work with Renesas RL78 simulator.
 ;	; MOVW    AX, 0xFFFFC           ; Save the ES and CS register.
 ;	; So the following code is used.
-;	MOV       A, CS                 ; Save CS register.
+;	MOV       A, CS
 ;	MOV       X, A
-;	MOV       A, ES                 ; Save ES register.
+;	MOV       A, ES
 ;	PUSH      AX
-;	Switch stack pointers. Interrupts which call FreeRTOS API functions
-;	ending with FromISR cannot be nested. On the other hand, high priority
-;	When SP <= CSTACK$$Base or CSTACK$$Limit < SP, do switching.
-	MOVW      AX, SP
-	CMPW      AX, #LWRD(CSTACK$$Base) 
-	BNH       $switching_sp
-	CMPW      AX, #LWRD(CSTACK$$Limit)
-	SKNH
-switching_sp:
-	MOVW      SP, #LWRD(CSTACK$$Limit)     ; Set stack pointer
-	PUSH      AX                    ; Save the previous SP register.
+;	Switch stack pointers.  Interrupts which call FreeRTOS API functions
+;	ending with FromISR cannot be nested.  On the other hand, high priority
+;	interrupts which don't call any FreeRTOS API functions can be nested.
+;	MOVW      DE, SP
+;	CMP0      _ucInterruptStackNesting
+;	SKNZ
+;	MOVW      SP, #LWRD(CSTACK$$Limit)
+;	INC       !_ucInterruptStackNesting
+;	Don't enable nested interrupts from the beginning of interrupt until
+;	the completion of switching the stack from task stacks to interrupt
+;	stack.  If it is enabled before switching the stack to interrupt
+;	stack, each task stack need additional space for nested interrupt.
+;	Moreover ucInterruptStackNesting has to be modified in the same DI
+;	period so that the next switching of the stack is perfomed correctly.
+;	(On the other hand, referring ucInterruptStackNesting as follows
+;	works with no problem.)
+;	EI or without EI
+	MOVW      AX, DE
+	CMP       _ucInterruptStackNesting, #1
+	SKNZ
+	MOVW      _pxInterruptedTaskStack, AX   ; Save the Stack Pointer.
 	ENDM
 ;------------------------------------------------------------------------------
 
@@ -166,8 +203,17 @@ switching_sp:
 ;   Restores the general purpose registers and the CS and ES registers.
 ;------------------------------------------------------------------------------
 portRESTORE_REGISTERS MACRO
-	POP       AX                    ; Restore the previous SP register.
-	MOVW      SP, AX
+;	Don't enable nested interrupts from the completion of switching the
+;	stack from interrupt stack to task stacks until the RETI or RETB
+;	instruction is executed.  If it is enabled after switching the stack,
+;	each task stack needs additional space for nested interrupts.
+;	Moreover ucInterruptStackNesting has to be modified in the same DI
+;	period so that the next switching of the stack is perfomed correctly.
+	MOVW      AX, _pxInterruptedTaskStack
+	DI
+	DEC       _ucInterruptStackNesting
+	SKNZ
+	MOVW      SP, AX                ; Restore the Stack Pointer.
 	POP       AX
 	; The following ICCRL78 compatible code doesn't work with Renesas RL78 simulator.
 	; MOVW    0xFFFFC, AX           ; Restore the ES and CS register.

@@ -52,7 +52,7 @@ interrupts don't accidentally become enabled before the scheduler is started. */
 #define portPSW_ISP_SYSCALL_INTERRUPT_EXECUTING  ( 2 << 1 )
 
 /* Macros to get/set PSW's ISP bits. (Operator '&' or '|' may change Zero Flag.) */
-#define portPSW_REG           ( * ( /* volatile is unnecessary in the use case here */ uint8_t * ) 0xfffa )
+#define portPSW_REG           ( * ( /* volatile is unnecessary in the use case here */ __near uint8_t * ) 0xfffa )
 #define portGET_PSW_ISP()     ( portPSW_REG & 0x06 /* 0b00000110 */ )
 #define portSET_PSW_ISP(val)  ( portPSW_REG = ( portPSW_REG & 0xF9 /* 0b11111001 */ ) | ( val ) )
 
@@ -70,6 +70,19 @@ usCriticalNesting will get set to zero when the scheduler starts, but must
 not be initialised to zero as that could cause problems during the startup
 sequence. */
 volatile uint16_t usCriticalNesting = portINITIAL_CRITICAL_NESTING;
+
+/* Each ISR which uses interrupt dedicated stack maintains a count of the interrupt
+nesting depth.  Each time an ISR is entered the count is incremented.  Each time
+an ISR is exited the count is decremented.  The stack is switched to interrupt stack
+from task stacks when the count changes from zero to one.  The stack is switched
+back to task stacks from interrupt stack when the count changes from one to zero.
+The count is held in the ucInterruptStackNesting variable.  The stack pointer value
+of interrupted task stack is held in the pxInterruptedTaskStack variable.  The value
+is saved to the variable when the stack is switched to interrupt stack from task
+stacks and restored from the variable when the stack is switched back to task stacks
+from interrupt stack. */
+volatile uint8_t ucInterruptStackNesting = 0;
+volatile __near StackType_t * pxInterruptedTaskStack = NULL;
 
 /*-----------------------------------------------------------*/
 

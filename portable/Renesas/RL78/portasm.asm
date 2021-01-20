@@ -45,7 +45,9 @@ $include "ISR_Support.h"
 ; handler.  This BRK handler is called not only outside a critical section
 ; but also inside a critical section.  The ISP bits value of PSW depends on
 ; each case but the value is saved by BRK instruction as a part of PSW and
-; restored by RETB instruction as a part of PSW.
+; restored by RETB instruction as a part of PSW.  Of course, FreeRTOS is
+; designed carefully that such call of the yield handler inside a critical
+; section doesn't make internal data structures corrupted.
 	.SECTION .text,TEXT
 _vPortYield:
 	.STACK _vPortYield = 16
@@ -70,7 +72,7 @@ $endif
 							        ; Additionally re-enable high priority interrupts
 							        ; but any FreeRTOS API functions cannot be called
 							        ; in its ISRs.
-	call@      _vTaskSwitchContext  ; Call the scheduler to select the next task.
+	call@	_vTaskSwitchContext     ; Call the scheduler to select the next task.
 	portRESTORE_CONTEXT		        ; Restore the context of the next task to run.
 	retb
 
@@ -120,8 +122,8 @@ _vPortFreeRTOSInterruptCommonHandler_C:
 _vPortInterruptCommonHandler_C:
 	.STACK _vPortFreeRTOSInterruptCommonHandler_C = 0
 	; Argument: BC is the target interrupt handler address.
-	;           DE is the stack pointer value before switching stack, or not used. It
-	;           depends on the ucInterruptStackNesting value.
+	;           DE is the stack pointer value before switching stack, or meaningless
+	;           depending on the ucInterruptStackNesting value.
 	portSAVE_REGISTERS_C	       ; Save the content of the registers.
 	; Call the target interrupt handler.
 	mov		cs, #0
