@@ -96,7 +96,7 @@ _vPortTickISR:
 							        ; but any FreeRTOS API functions cannot be called
 							        ; in its ISRs.
 	call@	_xTaskIncrementTick     ; Call the timer tick function.
-	or		a, x			        ; Check the return value is zero or not.
+	cmp0	x			            ; Check the return value is zero or not(== one).
 	skz						        ; Skip the scheduler call if the value is zero.
 	call@	_vTaskSwitchContext     ; Call the scheduler to select the next task.
 	portRESTORE_CONTEXT		        ; Restore the context of the next task to run.

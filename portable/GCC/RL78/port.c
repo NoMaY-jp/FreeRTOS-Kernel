@@ -66,6 +66,19 @@ not be initialised to zero as that could cause problems during the startup
 sequence. */
 volatile uint16_t usCriticalNesting = portINITIAL_CRITICAL_NESTING;
 
+/* Each ISR which uses interrupt dedicated stack maintains a count of the interrupt
+nesting depth.  Each time an ISR is entered the count is incremented.  Each time
+an ISR is exited the count is decremented.  The stack is switched to interrupt stack
+from task stacks when the count changes from zero to one.  The stack is switched
+back to task stacks from interrupt stack when the count changes from one to zero.
+The count is held in the ucInterruptStackNesting variable.  The stack pointer value
+of interrupted task stack is held in the pxInterruptedTaskStack variable.  The value
+is saved to the variable when the stack is switched to interrupt stack from task
+stacks and restored from the variable when the stack is switched back to task stacks
+from interrupt stack. */
+volatile uint8_t ucInterruptStackNesting = 0;
+volatile StackType_t * pxInterruptedTaskStack = NULL;
+
 /*-----------------------------------------------------------*/
 
 /*
@@ -85,6 +98,11 @@ volatile uint16_t usCriticalNesting = portINITIAL_CRITICAL_NESTING;
  * (defined in portasm.S).
  */
 extern void vPortStartFirstTask( void );
+
+/*
+ * Used to catch tasks that attempt to return from their implementing function.
+ */
+static void prvTaskExitError( void );
 
 /*-----------------------------------------------------------*/
 
@@ -110,10 +128,11 @@ uint32_t *pulLocal;
 	pxTopOfStack--;
 
 	/* The return address, leaving space for the first two bytes of	the
-	32-bit value. */
+	32-bit value.  See the comments above the prvTaskExitError() prototype
+	at the top of this file. */
 	pxTopOfStack--;
 	pulLocal = ( uint32_t * ) pxTopOfStack;
-	*pulLocal = ( uint32_t ) 0;
+	*pulLocal = ( uint32_t ) ( uint16_t ) prvTaskExitError;
 	pxTopOfStack--;
 
 	/* The start address / PSW value is also written in as a 32bit value,
@@ -154,7 +173,21 @@ uint32_t *pulLocal;
 }
 /*-----------------------------------------------------------*/
 
-portBASE_TYPE xPortStartScheduler( void )
+static void prvTaskExitError( void )
+{
+	/* A function that implements a task must not exit or attempt to return to
+	its caller as there is nothing to return to.  If a task wants to exit it
+	should instead call vTaskDelete( NULL ).
+
+	Artificially force an assert() to be triggered if configASSERT() is
+	defined, then stop here so application writers can catch the error. */
+	configASSERT( usCriticalNesting == ~0U );
+	portDISABLE_INTERRUPTS();
+	for( ;; );
+}
+/*-----------------------------------------------------------*/
+
+BaseType_t xPortStartScheduler( void )
 {
 	/* Setup the hardware to generate the tick.  Interrupts are disabled when
 	this function is called. */

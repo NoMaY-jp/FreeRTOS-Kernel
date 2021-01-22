@@ -57,7 +57,7 @@ portSAVE_CONTEXT .MACRO
 ;	ending with FromISR cannot be nested.  On the other hand, high priority
 ;	interrupts which don't call any FreeRTOS API functions can be nested.
 	MOVW      DE, SP
-	MOVW      SP, #LOWW(__STACK_ADDR_START) ; Set stack pointer
+	MOVW      SP, #LOWW(__STACK_ADDR_START) ; Set stack pointer.
 	ONEB      !_ucInterruptStackNesting     ; Change the value: 0 --> 1.
 ;	Don't enable nested interrupts from the beginning of interrupt until
 ;	the completion of switching the stack from task stacks to interrupt

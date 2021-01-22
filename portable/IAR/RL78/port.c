@@ -99,7 +99,7 @@ volatile __near StackType_t * pxInterruptedTaskStack = NULL;
 #endif
 
 /*
- * Defined in portasm.s87, this function starts the scheduler by loading the
+ * Defined in portasm.s, this function starts the scheduler by loading the
  * context of the first task to run.
  */
 extern void vPortStartFirstTask( void );
