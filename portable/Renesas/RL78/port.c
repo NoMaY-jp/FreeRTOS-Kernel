@@ -29,6 +29,14 @@
 #include "FreeRTOS.h"
 #include "task.h"
 
+/* Miscellaneous checks for this port. */
+#if ( defined( configKERNEL_INTERRUPT_PRIORITY ) && !defined( configMAX_SYSCALL_INTERRUPT_PRIORITY ) ) || \
+    ( !defined( configKERNEL_INTERRUPT_PRIORITY ) && defined( configMAX_SYSCALL_INTERRUPT_PRIORITY ) ) || \
+    ( defined( configKERNEL_INTERRUPT_PRIORITY ) && ( configKERNEL_INTERRUPT_PRIORITY != 3 ) ) || \
+    ( defined( configMAX_SYSCALL_INTERRUPT_PRIORITY ) && ( configMAX_SYSCALL_INTERRUPT_PRIORITY != 3 ) )
+    #error Invalid configKERNEL_INTERRUPT_PRIORITY and/or configMAX_SYSCALL_INTERRUPT_PRIORITY setting - both must be set to 3, or left undefined.
+#endif
+
 /* The critical nesting value is initialised to a non zero value to ensure
 interrupts don't accidentally become enabled before the scheduler is started. */
 #define portINITIAL_CRITICAL_NESTING  ( ( uint16_t ) 10 )
