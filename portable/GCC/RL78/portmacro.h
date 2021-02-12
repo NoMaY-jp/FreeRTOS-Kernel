@@ -76,26 +76,26 @@ typedef unsigned short UBaseType_t;
  * interrupt API to ensure API function and interrupt entry is as fast and as
  * simple as possible. */
 
-void vPortDISABLE_SYSCALL_INTERRUPT( void );
-#define portDISABLE_INTERRUPTS()  vPortDISABLE_SYSCALL_INTERRUPT()
+void vPortRaiseISP( void );
+#define portDISABLE_INTERRUPTS()  vPortRaiseISP()
 
-void vPortENABLE_SYSCALL_INTERRUPT( void );
-#define portENABLE_INTERRUPTS()   vPortENABLE_SYSCALL_INTERRUPT()
+void vPortResetISP( void );
+#define portENABLE_INTERRUPTS()   vPortResetISP()
 
 #ifdef configASSERT
-	void vPortASSERT_IF_SYSCALL_INTERRUPT_PRIORITY_INVALID( void );
-	#define portASSERT_IF_INTERRUPT_PRIORITY_INVALID()  vPortASSERT_IF_SYSCALL_INTERRUPT_PRIORITY_INVALID()
+	void vPortValidateInterruptPriority( void );
+	#define portASSERT_IF_INTERRUPT_PRIORITY_INVALID()  vPortValidateInterruptPriority()
 #endif
 /*-----------------------------------------------------------*/
 
 /* Critical section control macros. */
 #define portNO_CRITICAL_SECTION_NESTING		( ( unsigned short ) 0 )
 
-void vPortENTER_CRITICAL( void );
-#define portENTER_CRITICAL()  vPortENTER_CRITICAL()
+void vPortEnterCritical( void );
+#define portENTER_CRITICAL()  vPortEnterCritical()
 
-void vPortEXIT_CRITICAL( void );
-#define portEXIT_CRITICAL()   vPortEXIT_CRITICAL()
+void vPortExitCritical( void );
+#define portEXIT_CRITICAL()   vPortExitCritical()
 /*-----------------------------------------------------------*/
 
 /* Task utilities. */

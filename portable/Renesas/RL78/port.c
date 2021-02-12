@@ -274,7 +274,7 @@ const uint16_t usCompareMatch = ( usClockHz / configTICK_RATE_HZ ) - 1UL;
 #endif /* ifndef configSETUP_TICK_INTERRUPT */
 /*-----------------------------------------------------------*/
 
-#define portENABLE_SYSCALL_INTERRUPT() \
+#define portRESET_ISP() \
 	do \
 	{ \
 		portSET_PSW_ISP( portPSW_ISP_SYSCALL_INTERRUPT_ENABLE ); \
@@ -282,7 +282,7 @@ const uint16_t usCompareMatch = ( usClockHz / configTICK_RATE_HZ ) - 1UL;
 /*-----------------------------------------------------------*/
 
 #if( configASSERT_DEFINED == 1 )
-#define portDISABLE_SYSCALL_INTERRUPT() \
+#define portRAISE_ISP() \
 	do \
 	{ \
 		if( portGET_PSW_ISP() == portPSW_ISP_SYSCALL_INTERRUPT_ENABLE) \
@@ -291,7 +291,7 @@ const uint16_t usCompareMatch = ( usClockHz / configTICK_RATE_HZ ) - 1UL;
 		} \
 	} while(0)
 #else
-#define portDISABLE_SYSCALL_INTERRUPT() \
+#define portRAISE_ISP() \
 	do \
 	{ \
 		portSET_PSW_ISP( portPSW_ISP_SYSCALL_INTERRUPT_DISABLE ); \
@@ -299,29 +299,29 @@ const uint16_t usCompareMatch = ( usClockHz / configTICK_RATE_HZ ) - 1UL;
 #endif
 /*-----------------------------------------------------------*/
 
-void vPortENABLE_SYSCALL_INTERRUPT( void )
+void vPortResetISP( void )
 {
-	portENABLE_SYSCALL_INTERRUPT();
+	portRESET_ISP();
 }
 /*-----------------------------------------------------------*/
 
-void vPortDISABLE_SYSCALL_INTERRUPT( void )
+void vPortRaiseISP( void )
 {
-	portDISABLE_SYSCALL_INTERRUPT();
+	portRAISE_ISP();
 }
 /*-----------------------------------------------------------*/
 
-#ifdef configASSERT
-void vPortASSERT_IF_SYSCALL_INTERRUPT_PRIORITY_INVALID( void )
+#if( configASSERT_DEFINED == 1 )
+void vPortValidateInterruptPriority( void )
 {
 	configASSERT( portGET_PSW_ISP() == portPSW_ISP_SYSCALL_INTERRUPT_EXECUTING );
 }
 #endif
 /*-----------------------------------------------------------*/
 
-void vPortENTER_CRITICAL( void )
+void vPortEnterCritical( void )
 {
-	portDISABLE_SYSCALL_INTERRUPT();
+	portRAISE_ISP();
 
 	/* Now interrupts are disabled ulCriticalNesting can be accessed
 	 * directly.  Increment ulCriticalNesting to keep a count of how many
@@ -330,7 +330,7 @@ void vPortENTER_CRITICAL( void )
 }
 /*-----------------------------------------------------------*/
 
-void vPortEXIT_CRITICAL( void )
+void vPortExitCritical( void )
 {
 	if( usCriticalNesting > portNO_CRITICAL_SECTION_NESTING )
 	{
@@ -341,7 +341,7 @@ void vPortEXIT_CRITICAL( void )
 		 * re-enabled. */
 		if( usCriticalNesting == portNO_CRITICAL_SECTION_NESTING )
 		{
-			portENABLE_SYSCALL_INTERRUPT();
+			portRESET_ISP();
 		}
 	}
 }
